@@ -57,3 +57,6 @@ def testing(save_path):
         #             new_cutout)
         count += 1
         break
+
+if __name__=='__main__':
+    testing('/home/grayson/Desktop/Code/Data_Processing/test_dataset')

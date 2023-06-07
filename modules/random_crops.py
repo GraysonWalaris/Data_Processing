@@ -129,6 +129,10 @@ def random_crop_around_bbox(img,
     max_distance_x = cropped_width//2 - bbox_width//2 - space_from_edge
     max_distance_y = cropped_height//2 -  bbox_height//2 - space_from_edge
 
+    if max_distance_x == 0 or max_distance_y == 0:
+        print('image size too small.. skipping')
+        return None, None, None
+
     # randomly find the new center distance of the crop
     x_center_distance = np.random.randint(-max_distance_x, max_distance_x)
     y_center_distance = np.random.randint(-max_distance_y, max_distance_y)
@@ -312,6 +316,12 @@ def random_crop_around_bbox_v2(img,
         processed_img_for_sam[new_bbox[1]:new_bbox[3], 
                               new_bbox[0]:new_bbox[2],
                               :] = bbox_img_processed
+        
+        plt.subplot(1, 2, 1)
+        plt.imshow(processed_img_for_sam)
+        plt.subplot(1, 2, 2)
+        plt.imshow(img_for_sam)
+        plt.show()
 
         predictor = sam_functions.SamPredictor(sam_model)
 
