@@ -4,9 +4,9 @@ import glob
 import numpy as np
 import cv2
 
-IMAGES_BASE_PATH = os.path.join(os.environ.get('TARSIER_MAIN_DATA_PATH'),
+IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
                                 'Images')
-LABELS_BASE_PATH = os.path.join(os.environ.get('TARSIER_MAIN_DATA_PATH'), 
+LABELS_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'), 
                                 'Labels_NEW')
 
 def get_img_info(label_path, img_name):
