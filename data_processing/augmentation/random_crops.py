@@ -3,11 +3,8 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import sys
-import glob
-import data_processing.sam_functions as sam_functions
-import data_processing.labels as labels
-import data_processing.view as view
+from .. import sam_functions
+from .. import view
 
 """A collection of methods for extracting random crops from the images in
 the Tarsier_Main_Dataset.

@@ -246,6 +246,3 @@ def get_img_info_from_img_name(img_name):
     img_info = get_img_info(labels_json_file, img_name)
    
     return img_info
-
-if __name__=='__main__':
-    pass

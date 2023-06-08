@@ -1,7 +1,8 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='data_processing',
+    packages=find_packages(),
     version='0.0.0',
 
     url='https://github.com/GraysonWalaris/data_processing',
@@ -14,6 +15,7 @@ setup(
         'numpy',
         'opencv-python',
         'matplotlib',
-        'segment_anything'
+        'segment_anything',
+        'fpie'
     ]
 )

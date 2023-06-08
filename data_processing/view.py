@@ -312,5 +312,3 @@ def increase_contrast(img):
                 adjusted[i,j] = 0
 
     return adjusted
-
-

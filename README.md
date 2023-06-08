@@ -30,3 +30,13 @@ On Linux, add this to your .bashrc:
 `export WALARIS_MAIN_DATA_PATH='/home/grayson/Documents/Tarsier_Main_Dataset/'`
 
 Now you should be set up!
+
+# Classes Documentation
+
+## blend
+
+`from data_processing import blend`
+
+### OOI_Blender
+
+Use this class to generate novel images by taking objects of interest from the Tarsier_Main_Dataset and blending them into background images of your choice.

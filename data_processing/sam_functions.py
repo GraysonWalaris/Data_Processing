@@ -58,3 +58,10 @@ def load_sam_model():
     sam_model = sam_model_registry[model_type](checkpoint=sam_checkpoint)
 
     return sam_model.to(device)
+
+def get_mask_from_sam(img, bbox, sam_model):
+    sam_model.set_image(img)
+    bbox = np.array(bbox)
+    masks, scores, logits = sam_model.predict(box=bbox, multimask_output=False)
+    mask = (masks[0].astype("uint8")) * 255
+    return mask[1:-1, 1:-1]
