@@ -10,6 +10,7 @@ from segment_anything import SamPredictor, sam_model_registry
 from data_processing.sam_functions import load_sam_model, get_mask_from_sam
 from data_processing.labels import get_random_label
 from fpie.process import EquProcessor
+from tqdm import tqdm
 
 import io
 
@@ -62,166 +63,180 @@ class OOI_Blender:
 
         # get possible background images from background img folder
         background_img_paths = glob.glob(background_img_folder_path+'/*')
-        count = 0
 
         # sample *num_samples* new images
-        while count < num_samples:
+        for count in tqdm(range(num_samples)):
+            is_sample_generated_successfully = False
+            while not is_sample_generated_successfully:
 
-            # set this to true to begin multi-object loop
-            add_another_object = True
+                # set this to true to begin multi-object loop
+                add_another_object = True
 
-            # get random background
-            idx_background = np.random.randint(0, len(background_img_paths))
-            background = read_image(background_img_paths[idx_background])
-            
-            # define probability to add another object in the image at each loop
-            prob = multi_object_param
-            bboxes = []
-            
-            # dict that keeps track of the number of different classes of object
-            # in each new img
-            classes = {'uav': 0, 'airplane': 0, 'bird': 0, 'helicopter': 0}
-            labels = []
-
-            while add_another_object:
-
-                # pull the img info from a random label in the main dataset
-                img_info = get_random_label(data_type=self.data_type,
-                                            data_split=self.data_split,
-                                            class_type=self.class_type)
-
-                # get relevant information from img_info
-                # get random idx from labels
-                labels_idx = np.random.randint(0, len(img_info['labels']))
-                label = img_info['labels'][labels_idx]
-                bbox = label['bbox']
-                src_img_path = os.path.join(IMAGES_BASE_PATH, 
-                                            img_info['image_path'])
-                src = read_image(src_img_path)
-
-                # use segment anything to generate a mask from the src ooi img
-                mask = get_mask_from_sam(src, bbox, mask_predictor)
-
-                # check if the mask is too close to the edge, if so, skip this 
-                # img. this is done to prevent introducing ooi that are cut off
-                # at the edges
-                too_close = self._is_too_close_to_edge(mask, buffer=10)
-                if too_close:
-                    continue
-
-                # increment class label in classes dict
-                category_name = label['category_name']
-                # if the class is 'ufo' skip it
-                if category_name not in classes:
-                    continue
-                classes[category_name] = classes[category_name] + 1
-
-                # randomize the location to place ooi within the background img
-                (src_random, 
-                mask_random, 
-                bbox) = self._random_placement(src.copy(), mask.copy(), 
-                                               background, buffer=10)
-                # if src_random is None, that means an invalid bbox was returned.
-                # Thus, we skip this object of interest
-                if src_random is None:
-                    continue
+                # get random background
+                idx_background = np.random.randint(0, len(background_img_paths))
+                background = read_image(background_img_paths[idx_background])
                 
-                # add to bboxes and labels lists
-                label['bbox'] = bbox
-                bboxes.append(bbox)
-                labels.append(label)
-
-                # blend the ooi into the background img using fpie library
-                try:
-                    n_random = solver.reset(src_random, 
-                                            mask_random, 
-                                            background, 
-                                            (0, 0), 
-                                            (0, 0))
-                    new_img_random, err = solver.step(STEPS)
-                except:
-                    print(bbox)
-                    print(background.shape)
-                    print('Exception on fpie solver! continuing...')
-                    continue
+                # define probability to add another object in the image at each loop
+                prob = multi_object_param
+                bboxes = []
                 
+                # dict that keeps track of the number of different classes of object
+                # in each new img
+                classes = {'uav': 0, 'airplane': 0, 'bird': 0, 'helicopter': 0}
+                labels = []
 
-                # create img with bboxes showing in case you wish to visualize
-                new_img_w_bbox_random = new_img_random.copy()
-                for bbox in bboxes:
-                    start_point = int(bbox[0]), int(bbox[1])
-                    end_point = int(bbox[2]), int(bbox[3])
-                    new_img_w_bbox_random = cv2.rectangle(new_img_w_bbox_random, 
-                                                          start_point, 
-                                                          end_point, 
-                                                          color=(255,0,0))
+                while add_another_object:
 
-                # determine if will add another object to this background img
-                add_another_object = (np.random.randint(0, 101) / 100) < prob
+                    # pull the img info from a random label in the main dataset
+                    img_info = get_random_label(data_type=self.data_type,
+                                                data_split=self.data_split,
+                                                class_type=self.class_type)
 
-                # if adding another object, decrease the prob that will add
-                # another object on the next loop iteration (decreases the 
-                # chances of seeing 3, 4, 5, etc objects)
-                if add_another_object:
-                    background = new_img_random
-                    prob *= prob
+                    # get relevant information from img_info
+                    # get random idx from labels
+                    labels_idx = np.random.randint(0, len(img_info['labels']))
+                    label = img_info['labels'][labels_idx]
+                    bbox = label['bbox']
+                    src_img_path = os.path.join(IMAGES_BASE_PATH, 
+                                                img_info['image_path'])
+                    src = read_image(src_img_path)
 
-            # show the synthetic images with bboxes
-            if visualize:
-                final_img = np.concatenate((new_img_random, 
-                                            new_img_w_bbox_random), axis=1)
-                plt.figure('final img')
-                plt.imshow(final_img)
-                plt.show()
+                    # use segment anything to generate a mask from the src ooi img
+                    mask = get_mask_from_sam(src, bbox, mask_predictor)
 
-            # save the new img
-            if save:
-                if save_path is None:
-                    img_save_path = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
-                                                            'Images')
-                else:
-                    img_save_path = save_path
-                category_name = max(classes, key=classes.get)
-                path_to_img_folder = os.path.join(img_save_path, 
-                                                  category_name,
-                                                  experiment_name)
-                # if the folder does not exist, create it
-                if not os.path.exists(path_to_img_folder):
-                    os.mkdir(path_to_img_folder)
+                    # check if the mask is too close to the edge, if so, skip this 
+                    # img. this is done to prevent introducing ooi that are cut off
+                    # at the edges
+                    too_close = self._is_too_close_to_edge(mask, buffer=10)
+                    if too_close:
+                        continue
 
-                # get the current number of images in that folder
-                num_imgs = len(glob.glob(path_to_img_folder+'/*.png'))
-                img_name = f'thermal_{category_name}_{str(num_imgs).zfill(6)}.png'
-                img_save_path = os.path.join(img_save_path,
-                                             category_name,
-                                             experiment_name,
-                                             img_name)
-                cv2.imwrite(img_save_path, new_img_random)
+                    # increment class label in classes dict
+                    category_name = label['category_name']
+                    # if the class is 'ufo' skip it
+                    if category_name not in classes:
+                        continue
+                    classes[category_name] = classes[category_name] + 1
 
-                # save the img label
-                # need to update the img_info
-                img_info['height'], img_info['width'], _ = new_img_random.shape
-                img_info['video_id'] = experiment_name
-                base_folder_path_length = len(os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
-                                                            'Images'))
-                img_info['image_path'] = img_save_path[base_folder_path_length+1:]
-                img_info['labels'] = labels
-                img_info['resolution'] = str(min(img_info['height'], 
-                                                 img_info['width']))+'p'
-                
-                if save_path is None:
-                    label_base_save_path = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
-                                                        'Labels_NEW')
-                    label_save_path = os.path.join(label_base_save_path,
-                                                   experiment_name,
-                                                   'train',
-                                                   category_name,
-                                                   f'{experiment_name}_{category_name}.json')
-                self._save_label(label_save_path, img_info, 
-                                 img_save_path.split('/')[-1][:-4])
-                
-            count += 1
-            print(f'Generated {count} images..')
+                    # randomize the location to place ooi within the background img
+                    (src_random, 
+                    mask_random, 
+                    bbox) = self._random_placement(src.copy(), mask.copy(), 
+                                                background, buffer=10)
+                    # if src_random is None, that means an invalid bbox was returned.
+                    # Thus, we skip this object of interest
+                    if src_random is None:
+                        continue
+                    
+                    # add to bboxes and labels lists
+                    label['bbox'] = bbox
+                    bboxes.append(bbox)
+                    labels.append(label)
+
+                    # blend the ooi into the background img using fpie library
+                    try:
+                        n_random = solver.reset(src_random, 
+                                                mask_random, 
+                                                background, 
+                                                (0, 0), 
+                                                (0, 0))
+                        new_img_random, err = solver.step(STEPS)
+                    except:
+                        print(bbox)
+                        print(background.shape)
+                        print('Exception on fpie solver! continuing...')
+                        continue
+                    
+
+                    # create img with bboxes showing in case you wish to visualize
+                    new_img_w_bbox_random = new_img_random.copy()
+                    for bbox in bboxes:
+                        start_point = int(bbox[0]), int(bbox[1])
+                        end_point = int(bbox[2]), int(bbox[3])
+                        new_img_w_bbox_random = cv2.rectangle(new_img_w_bbox_random, 
+                                                            start_point, 
+                                                            end_point, 
+                                                            color=(255,0,0))
+
+                    # determine if will add another object to this background img
+                    add_another_object = (np.random.randint(0, 101) / 100) < prob
+
+                    # if adding another object, decrease the prob that will add
+                    # another object on the next loop iteration (decreases the 
+                    # chances of seeing 3, 4, 5, etc objects)
+                    if add_another_object:
+                        background = new_img_random
+                        prob *= prob
+
+                # show the synthetic images with bboxes
+                if visualize:
+                    final_img = np.concatenate((new_img_random, 
+                                                new_img_w_bbox_random), axis=1)
+                    plt.figure('final img')
+                    plt.imshow(final_img)
+                    plt.show()
+
+                # save the new img
+                if save:
+                    if save_path is None:
+                        img_save_path = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
+                                                                'Images')
+                        category_name = max(classes, key=classes.get)
+                        path_to_img_folder = os.path.join(img_save_path, 
+                                                        category_name,
+                                                        experiment_name)
+                    else:
+                        img_save_path = save_path
+                        category_name = max(classes, key=classes.get)
+                        path_to_img_folder = img_save_path
+                    
+                    # if the folder does not exist, create it
+                    if not os.path.exists(path_to_img_folder):
+                        os.makedirs(path_to_img_folder)
+
+                    # get the current number of images in that folder
+                    num_imgs = len(glob.glob(path_to_img_folder+'/*.png'))
+                    img_name = f'thermal_{category_name}_{str(num_imgs).zfill(6)}.png'
+
+                    # if save path is None, save to the main dataset. This requires,
+                    # more processing of the img_save_path. If you have specified
+                    # the save path, just save to that file.
+                    if save_path is None:
+                        img_save_path = os.path.join(img_save_path,
+                                                    category_name,
+                                                    experiment_name,
+                                                    img_name)
+                    else:
+                        img_save_path = os.path.join(img_save_path, img_name)
+
+                    cv2.imwrite(img_save_path, new_img_random)
+
+                    # save the img label
+                    # need to update the img_info
+                    img_info['height'], img_info['width'], _ = new_img_random.shape
+                    img_info['video_id'] = experiment_name
+                    base_folder_path_length = len(os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
+                                                                'Images'))
+                    img_info['image_path'] = img_save_path[base_folder_path_length+1:]
+                    img_info['labels'] = labels
+                    img_info['resolution'] = str(min(img_info['height'], 
+                                                    img_info['width']))+'p'
+                    
+                    if save_path is None:
+                        label_base_save_path = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
+                                                            'Labels_NEW')
+                        label_save_path = os.path.join(label_base_save_path,
+                                                    experiment_name,
+                                                    'train',
+                                                    category_name,
+                                                    f'{experiment_name}_{category_name}.json')
+                    else:
+                        label_save_path = os.path.join(save_path,
+                                                    'labels.json')
+                    self._save_label(label_save_path, img_info, 
+                                    img_save_path.split('/')[-1][:-4])
+                    
+                is_sample_generated_successfully = True
                 
     def test_saved_data(self, labels_file):
         """Used to test the data generated by the 'blend_ooi_to_backgrounds_script.
@@ -282,10 +297,7 @@ class OOI_Blender:
                     break
 
             if x2 < x1 or y2 < y1:
-                plt.figure()
-                plt.imshow(mask)
-                plt.show()
-
+                
                 # not sure what causes this error, but if x2 < x1 or y2 < y1 skip
                 return None, None, None, None
 
@@ -391,3 +403,4 @@ class OOI_Blender:
         with open(label_file_path, 'w') as outfile:
             json.dump(json_object, outfile)
                 
+

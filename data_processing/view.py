@@ -2,6 +2,17 @@ import cv2
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import torch
+
+def show_bboxes_plt(boxes, ax, bbox_format: str, labels=None):
+    if labels is not None:
+        for idx in range(len(boxes)):
+            show_bbox_plt(boxes[idx], ax, 
+                          bbox_format='xywh', label=labels[idx])
+    else:
+        for idx in range(len(boxes)):
+            show_bbox_plt(boxes[idx], ax, bbox_format='xywh')
+    
 
 def show_bbox_cv2(img, bbox):
     x, y, x2, y2 = bbox
@@ -11,11 +22,20 @@ def show_bbox_cv2(img, bbox):
 
     return img
 
-def show_bbox_plt(box, ax):
-    x0, y0 = box[0], box[1]
-    w, h = box[2] - box[0], box[3] - box[1]
-    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
-                                facecolor=(0,0,0,0), lw=2))
+def show_bbox_plt(box, ax, bbox_format: str, label=None):
+    if bbox_format == 'xyxy':
+        x0, y0 = box[0], box[1]
+        w, h = box[2] - box[0], box[3] - box[1]
+        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
+                                    facecolor=(0,0,0,0), lw=2))
+    elif bbox_format == 'xywh':
+        x0, y0 = box[0], box[1]
+        w, h = box[2], box[3]
+        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
+                                    facecolor=(0,0,0,0), lw=1))
+    if label is not None:
+        ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
+        
 
 def show_points(coords, labels, ax, marker_size=375):
     pos_points = coords[labels==1]
@@ -23,10 +43,18 @@ def show_points(coords, labels, ax, marker_size=375):
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', 
                s=marker_size, edgecolor='white', linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', 
-               s=marker_size, edgecolor='white', linewidth=1.25) 
+               s=marker_size, edgecolor='white', linewidth=1.25)
+    
+def show_masks(masks, ax, random_color=True):
+    # new_img = view.superimpose_mask(img, result_ovr_thr[2][0])
+    for mask in masks:
+        show_mask(mask, ax, random_color)
 
 def show_mask(mask, ax, random_color=False):
-    mask = mask.detach().cpu()
+    try:
+        mask = mask.detach().cpu().numpy()
+    except:
+        pass
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
@@ -34,6 +62,29 @@ def show_mask(mask, ax, random_color=False):
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
+
+def superimpose_mask(img, mask, random_color=False, alpha=.5):
+    # NOT TESTED!!!!
+    """Places a mask over the image using opencv and alpha blending.
+    
+    Parameters
+    """
+    try: 
+        if mask.shape[2]:
+            mask = mask[:2]
+    except:
+        pass
+    if random_color:
+        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    else:
+        color = np.array([30/255, 144/255, 255/255])
+    h, w = mask.shape[-2:]
+    mask_image = (mask.reshape(h, w, 1) * color.reshape(1, 1, -1)).astype('uint8')
+    
+    # blend onto the image using cv2 alpha blending
+    blended_img = cv2.addWeighted(img, alpha, mask_image, 2-alpha, 0)
+
+    return blended_img
 
 def visualize_sam(img, masks, bboxes=None, points=None):
     """Does not have points functionality yet. Need to add if desired."""

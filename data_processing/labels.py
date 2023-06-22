@@ -3,11 +3,251 @@ import os
 import glob
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
                                 'Images')
 LABELS_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'), 
                                 'Labels_NEW')
+
+COCO_CLASSES = [
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic_light",
+    "fire_hydrant",
+    "stop_sign",
+    "parking_meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports_ball",
+    "kite",
+    "baseball_bat",
+    "baseball_glove",
+    "skateboard",
+    "surfboard",
+    "tennis_racket",
+    "bottle",
+    "wine_glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot_dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted_plant",
+    "bed",
+    "dining_table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell_phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy_bear",
+    "hair_drier",
+    "toothbrush",
+]
+
+COCO_CLASSES_DICT_NAME2NUM = {}
+COCO_CLASSES_DICT_NUM2NAME = {}
+for num, class_type in enumerate(COCO_CLASSES):
+    COCO_CLASSES_DICT_NAME2NUM[class_type] = num
+    COCO_CLASSES_DICT_NUM2NAME[num] = class_type
+
+COCO_CATEGORIES = [
+    {"supercategory": "person","id": 1,"name": "person"},
+    {"supercategory": "vehicle","id": 2,"name": "bicycle"},
+    {"supercategory": "vehicle","id": 3,"name": "car"},
+    {"supercategory": "vehicle","id": 4,"name": "motorcycle"},
+    {"supercategory": "vehicle","id": 5,"name": "airplane"},
+    {"supercategory": "vehicle","id": 6,"name": "bus"},
+    {"supercategory": "vehicle","id": 7,"name": "train"},
+    {"supercategory": "vehicle","id": 8,"name": "truck"},
+    {"supercategory": "vehicle","id": 9,"name": "boat"},
+    {"supercategory": "outdoor","id": 10,"name": "traffic light"},
+    {"supercategory": "outdoor","id": 11,"name": "fire hydrant"},
+    {"supercategory": "outdoor","id": 13,"name": "stop sign"},
+    {"supercategory": "outdoor","id": 14,"name": "parking meter"},
+    {"supercategory": "outdoor","id": 15,"name": "bench"},
+    {"supercategory": "animal","id": 16,"name": "bird"},
+    {"supercategory": "animal","id": 17,"name": "cat"},
+    {"supercategory": "animal","id": 18,"name": "dog"},
+    {"supercategory": "animal","id": 19,"name": "horse"},
+    {"supercategory": "animal","id": 20,"name": "sheep"},
+    {"supercategory": "animal","id": 21,"name": "cow"},
+    {"supercategory": "animal","id": 22,"name": "elephant"},
+    {"supercategory": "animal","id": 23,"name": "bear"},
+    {"supercategory": "animal","id": 24,"name": "zebra"},
+    {"supercategory": "animal","id": 25,"name": "giraffe"},
+    {"supercategory": "accessory","id": 27,"name": "backpack"},
+    {"supercategory": "accessory","id": 28,"name": "umbrella"},
+    {"supercategory": "accessory","id": 31,"name": "handbag"},
+    {"supercategory": "accessory","id": 32,"name": "tie"},
+    {"supercategory": "accessory","id": 33,"name": "suitcase"},
+    {"supercategory": "sports","id": 34,"name": "frisbee"},
+    {"supercategory": "sports","id": 35,"name": "skis"},
+    {"supercategory": "sports","id": 36,"name": "snowboard"},
+    {"supercategory": "sports","id": 37,"name": "sports ball"},
+    {"supercategory": "sports","id": 38,"name": "kite"},
+    {"supercategory": "sports","id": 39,"name": "baseball bat"},
+    {"supercategory": "sports","id": 40,"name": "baseball glove"},
+    {"supercategory": "sports","id": 41,"name": "skateboard"},
+    {"supercategory": "sports","id": 42,"name": "surfboard"},
+    {"supercategory": "sports","id": 43,"name": "tennis racket"},
+    {"supercategory": "kitchen","id": 44,"name": "bottle"},
+    {"supercategory": "kitchen","id": 46,"name": "wine glass"},
+    {"supercategory": "kitchen","id": 47,"name": "cup"},
+    {"supercategory": "kitchen","id": 48,"name": "fork"},
+    {"supercategory": "kitchen","id": 49,"name": "knife"},
+    {"supercategory": "kitchen","id": 50,"name": "spoon"},
+    {"supercategory": "kitchen","id": 51,"name": "bowl"},
+    {"supercategory": "food","id": 52,"name": "banana"},
+    {"supercategory": "food","id": 53,"name": "apple"},
+    {"supercategory": "food","id": 54,"name": "sandwich"},
+    {"supercategory": "food","id": 55,"name": "orange"},
+    {"supercategory": "food","id": 56,"name": "broccoli"},
+    {"supercategory": "food","id": 57,"name": "carrot"},
+    {"supercategory": "food","id": 58,"name": "hot dog"},
+    {"supercategory": "food","id": 59,"name": "pizza"},
+    {"supercategory": "food","id": 60,"name": "donut"},
+    {"supercategory": "food","id": 61,"name": "cake"},
+    {"supercategory": "furniture","id": 62,"name": "chair"},
+    {"supercategory": "furniture","id": 63,"name": "couch"},
+    {"supercategory": "furniture","id": 64,"name": "potted plant"},
+    {"supercategory": "furniture","id": 65,"name": "bed"},
+    {"supercategory": "furniture","id": 67,"name": "dining table"},
+    {"supercategory": "furniture","id": 70,"name": "toilet"},
+    {"supercategory": "electronic","id": 72,"name": "tv"},
+    {"supercategory": "electronic","id": 73,"name": "laptop"},
+    {"supercategory": "electronic","id": 74,"name": "mouse"},
+    {"supercategory": "electronic","id": 75,"name": "remote"},
+    {"supercategory": "electronic","id": 76,"name": "keyboard"},
+    {"supercategory": "electronic","id": 77,"name": "cell phone"},
+    {"supercategory": "appliance","id": 78,"name": "microwave"},
+    {"supercategory": "appliance","id": 79,"name": "oven"},
+    {"supercategory": "appliance","id": 80,"name": "toaster"},
+    {"supercategory": "appliance","id": 81,"name": "sink"},
+    {"supercategory": "appliance","id": 82,"name": "refrigerator"},
+    {"supercategory": "indoor","id": 84,"name": "book"},
+    {"supercategory": "indoor","id": 85,"name": "clock"},
+    {"supercategory": "indoor","id": 86,"name": "vase"},
+    {"supercategory": "indoor","id": 87,"name": "scissors"},
+    {"supercategory": "indoor","id": 88,"name": "teddy bear"},
+    {"supercategory": "indoor","id": 89,"name": "hair drier"},
+    {"supercategory": "indoor","id": 90,"name": "toothbrush"}
+]
+
+WALARIS_CLASS_LABELS_NAME2NUM = {
+    "uav": 1,
+    "airplane": 2, 
+    "bicycle": 3,
+    "bird": 4,
+    "boat": 5,
+    "bus": 6,
+    "car": 7,
+    "cat": 8,
+    "cow": 9,
+    "dog": 10,
+    "horse": 11,
+    "motorcycle": 12,
+    "person": 13,
+    "traffic_light": 14,
+    "train": 15,
+    "truck": 16,
+    "ufo": 17,
+    "helicopter": 18
+}
+
+WALARIS_CLASS_LABELS_NUM2NAME = {
+    1: "uav",
+    2: "airplane", 
+    3: "bicycle",
+    4: "bird",
+    5: "boat",
+    6: "bus",
+    7: "car",
+    8: "cat",
+    9: "cow",
+    10: "dog",
+    11: "horse",
+    12: "motorcycle",
+    13: "person",
+    14: "traffic_light",
+    15: "train",
+    16: "truck",
+    17: "ufo",
+    18: "helicopter",
+}
+
+MAPPING_WALARIS_TO_COCO = {
+    1: 5,   # uav (1) -> airplance (5)
+    2: 5,   # airplane (2) -> airplane (5)
+    3: 2,   # bicycle (3) -> bicycle (2)
+    4: 16,  # bird (4) -> bird (16)
+    5: 9,   # boat (5) -> boat (9)
+    6: 6,   # bus (6) -> bus (6)
+    7: 3,   # car (7) -> car (3)
+    8: 17,  # cat (8) -> cat (17)
+    9: 21,  # cow (9) -> cow (21)
+    10: 18, # dog (10) -> dog (18)
+    11: 19, # horse (11) -> horse (19)
+    12: 4,  # motorcycle (12) -> motorcycle (4)
+    13: 1,  # person (13) -> person (1)
+    14: 10, # traffic_light (14) -> traffic light (10)
+    15: 7,  # train (15) -> train (7)
+    16: 8,  # truck (16) -> truck (8)
+    17: 16, # ufo (17) -> bird (16)
+    18: 5   # helicopter (18) -> airplane (5)
+}
+
+MAPPING_COCO_TO_WALARIS = {
+
+}
 
 def get_img_info(label_path, img_name):
     # if img_name is pass with .png or .jpg extension, remove it
@@ -179,33 +419,153 @@ def get_img_from_img_info(img_info):
 
     return img
 
-def save_label_to_file(label_file_path, label):
-    """Adds label to a json file. Creates a new file if it does not exist.
+def save_dict_to_json(json_file_path, dictionary, delete=False):
+    """Adds dictionary to a json file. Creates a new file if it does not exist.
 
     Parameters:
         label_file_path (str): path to label file
         label (dict): label dictionary to add to the json file
-         in the form:
-         label = {
-            'bbox': bbox,
-            'image_path': image_path,
-            'original_image_path': original_image_path
-         }
     """
 
-    if os.path.exists(label_file_path):
-        with open(label_file_path) as f:
+    if os.path.exists(json_file_path):
+        with open(json_file_path) as f:
             json_object = json.load(f)
         if type(json_object) is dict:
             json_object = [json_object]
-        json_object.append(label)
+        json_object.append(dictionary)
+        if delete:
+            os.remove(json_file_path)
+            json_object = dictionary
     else:
-        json_object = label
+        json_object = dictionary
 
-    with open(label_file_path, 'w') as outfile:
+    with open(json_file_path, 'w') as outfile:
         json.dump(json_object, outfile)
 
     return
+
+def test_label(label_file, img_name):
+    """Given the image name and label file, show the image on the screen with
+    the bounding boxes superimposed on the image. Will be used to verify the 
+    labels. The label file is assumed to be in the Walaris standard format.
+    
+    Parameters:
+        label_file (str): path to the label file
+        img_name (str): name of the image you wish to test
+        
+    Returns:
+        None
+    """
+
+    # get the img_info dict from labels file
+    with open(label_file, 'r') as file:
+        data = json.load(file)
+
+    img_info = data[img_name]
+
+    # read the image
+    img_path = os.path.join(IMAGES_BASE_PATH, img_info['image_path'])
+    img = cv2.imread(img_path)
+
+    # get a list of bboxes from the label
+    bboxes = []
+    class_labels = []
+
+    for label in img_info['labels']:
+        bboxes.append(label['bbox'])
+        class_labels.append(label['category_name'])
+
+    # loop through each bounding box and superimpose it on the image
+    for idx in range(len(bboxes)):
+        x1, y1, x2, y2 = bboxes[idx]
+        start_point = (int(x1), int(y1))
+        end_point = (int(x2), int(y2))
+        cv2.rectangle(img, start_point, end_point, 
+                      color=(0, 0, 255), thickness=1)
+        cv2.putText(
+            img,
+            class_labels[idx],
+            (int(x1), int(y1)-10),
+            fontFace = cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale = 0.6,
+            color = (0, 255, 0),
+            thickness=2
+        )
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+ 
+    plt.figure('label test')
+    plt.imshow(img)
+    plt.show()
+
+def create_labels(bboxes, class_labels):
+    """ Creates a list of bbox labels with class_label information
+
+    Parameters:
+        bboxes (list): list of bounding boxes in an image
+        class_labels (list): list of class labels in an image that correspond
+         in order to the list of bounding boxes
+
+    Returns:
+        label (list): 
+            (example)
+            [
+                {'bbox': [x1, y1, x2, y2], 'category_id': x, 'category_name': xxxx},
+                {'bbox': [x1, y1, x2, y2], 'category_id': x, 'category_name': xxxx},
+                {'bbox': [x1, y1, x2, y2], 'category_id': x, 'category_name': xxxx},
+            ]
+    """
+    assert len(bboxes) == len(class_labels), "Error: Number of bounding boxes \
+        does not match number of class labels."
+    labels = []
+    for idx in range(len(bboxes)):
+        bbox = bboxes[idx]
+        category_name = class_labels[idx]
+        category_id = WALARIS_CLASS_LABELS[category_name]
+
+        labels.append({
+            'bbox': bbox,
+            'category_name': category_name,
+            'category_id': category_id
+        })
+
+    return labels
+
+def create_img_info(img_path, bboxes, class_labels):
+    """Creates an image info dictionary in the Walaris standard format.
+
+    Parameters:
+        img_path (str): file path of the image
+        bboxes (list): list of bounding boxes for the objects detected in the
+         image
+        class_labels (list): list of class labels that correspond to the list
+         of bounding boxes
+
+    Returns:
+        label (dict): A label dictionary that follows the standard Walaris
+         label format
+    """
+    img_path = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
+                            'Images',
+                            ('/').join(img_path.split('/')[-3:]))
+    img = cv2.imread(img_path)
+    global_class_label, video_id, img_name = img_path.split('/')[-3:]
+    height, width, _ = img.shape
+    labels = create_labels(bboxes, class_labels)
+    resolution = f'{height}p'
+
+    img_info = {
+        'height': height,
+        'width': width,
+        'resolution': resolution,
+        'video_id': video_id,
+        'image_path': ('/').join(img_path.split('/')[-3:]),
+        'labels': labels
+    }
+
+    return img_info, img_name.split('.')[0]
+
+
 
 def get_img_info_from_img_name(img_name):
     """Given a string of the name of the image (ie. thermal_uav_574_000058.png)
