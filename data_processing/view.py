@@ -1,157 +1,336 @@
 import cv2
 import numpy as np
-import math
 import matplotlib.pyplot as plt
-import torch
+import os
+import json
 
-def show_bboxes_plt(boxes, ax, bbox_format: str, labels=None):
+from labels import COCO_CLASSES_DICT_NUM2NAME, COCO_CLASSES_DICT_NAME2NUM
+
+def show_bboxes(boxes, ax, bbox_format: str, labels=None):
+    """Displays an image with bounding boxes and labels drawn.
+    
+    Args:
+        boxes (list): list of bounding boxes
+        ax (plt.ax object): axis object from matplotlib.pyplot
+        bbox_format (str): specify the format for the bboxes
+        labels (list): a list of labels in string format
+        
+    Returns:
+    
+    """
+    def show_bbox(box, ax, bbox_format: str, label=None):
+        """Draw one bbox and corresponding label to a plt.ax object."""
+        if bbox_format == 'xyxy':
+            x0, y0 = box[0], box[1]
+            w, h = box[2] - box[0], box[3] - box[1]
+            ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
+                                        facecolor=(0,0,0,0), lw=2))
+        elif bbox_format == 'xywh':
+            x0, y0 = box[0], box[1]
+            w, h = box[2], box[3]
+            ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
+                                        facecolor=(0,0,0,0), lw=1))
+        if label is not None:
+            ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
+
     if labels is not None:
         for idx in range(len(boxes)):
-            show_bbox_plt(boxes[idx], ax, 
+            show_bbox(boxes[idx], ax, 
                           bbox_format='xywh', label=labels[idx])
     else:
         for idx in range(len(boxes)):
-            show_bbox_plt(boxes[idx], ax, bbox_format='xywh')
-    
-
-def show_bbox_cv2(img, bbox):
-    x, y, x2, y2 = bbox
-    w = x2 - x
-    h = y2 - y
-    img = cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-
-    return img
-
-def show_bbox_plt(box, ax, bbox_format: str, label=None):
-    if bbox_format == 'xyxy':
-        x0, y0 = box[0], box[1]
-        w, h = box[2] - box[0], box[3] - box[1]
-        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
-                                    facecolor=(0,0,0,0), lw=2))
-    elif bbox_format == 'xywh':
-        x0, y0 = box[0], box[1]
-        w, h = box[2], box[3]
-        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
-                                    facecolor=(0,0,0,0), lw=1))
-    if label is not None:
-        ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
-        
-
-def show_points(coords, labels, ax, marker_size=375):
-    pos_points = coords[labels==1]
-    neg_points = coords[labels==0]
-    ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', 
-               s=marker_size, edgecolor='white', linewidth=1.25)
-    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', 
-               s=marker_size, edgecolor='white', linewidth=1.25)
+            show_bbox(boxes[idx], ax, bbox_format='xywh')
     
 def show_masks(masks, ax, random_color=True):
-    # new_img = view.superimpose_mask(img, result_ovr_thr[2][0])
+    """Displays an image with bounding boxes and labels drawn.
+    
+    Args:
+        masks (list): list of masks in np binary format (1 channel)
+        ax (plt.ax object): axis object from matplotlib.pyplot
+        random_color (bool): specifies whether a random color will be used
+        
+    Returns:
+    
+    """
+    def show_mask(mask, ax, random_color=False):
+        """Draw one mask to a plt.ax object."""
+        try:
+            mask = mask.detach().cpu().numpy()
+        except:
+            pass
+        if random_color:
+            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+        else:
+            color = np.array([30/255, 144/255, 255/255, 0.6])
+        h, w = mask.shape[-2:]
+        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+        ax.imshow(mask_image)
+
     for mask in masks:
         show_mask(mask, ax, random_color)
 
-def show_mask(mask, ax, random_color=False):
-    try:
-        mask = mask.detach().cpu().numpy()
-    except:
-        pass
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
-    h, w = mask.shape[-2:]
-    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    ax.imshow(mask_image)
-
-def superimpose_mask(img, mask, random_color=False, alpha=.5):
-    # NOT TESTED!!!!
-    """Places a mask over the image using opencv and alpha blending.
+def convert_mask_binary2rgb(binary_mask):
+    """Goes from binary (h, w, 1) -> rgb (h, w, 3) where all channels are 255 
+    (white) or 0 (black)
     
-    Parameters
-    """
-    try: 
-        if mask.shape[2]:
-            mask = mask[:2]
-    except:
-        pass
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255])
-    h, w = mask.shape[-2:]
-    mask_image = (mask.reshape(h, w, 1) * color.reshape(1, 1, -1)).astype('uint8')
-    
-    # blend onto the image using cv2 alpha blending
-    blended_img = cv2.addWeighted(img, alpha, mask_image, 2-alpha, 0)
+    Args:
+        binary_mask (numpy arr): binary mask to convert
 
-    return blended_img
-
-def visualize_sam(img, masks, bboxes=None, points=None):
-    """Does not have points functionality yet. Need to add if desired."""
-
-    if bboxes is None and points is None:
-        print('Error: Must pass bboxes or points to visualize a sam output!')
-        return
-    
-    if bboxes is None:
-        print('Error! Must pass a bbox to visualize a sam output!')
-        return
-
-    plt.figure('original image')
-    plt.imshow(img)
-
-    plt.figure('visualize sam')
-    plt.imshow(img)
-
-    for mask in masks:
-        show_mask(mask, plt.gca())
-    for bbox in bboxes:
-        show_bbox_plt(bbox, plt.gca())
-
-    plt.axis('off')
-    plt.show()
-
-def get_rgb_mask_from_binary_mask(mask):
-    """Goes from (h, w, 1) -> (h, w, 3) where all channels are 255 (white)
-    Parameters
-        mask (numpy arr): mask to convert
+    Returns:
+        rgb_mask (np array): converted rgb mask
     """
 
-    h, w, _ = mask.shape
-    mask_rgb = np.zeros((h, w, 3), dtype='uint8')
+    h, w, _ = binary_mask.shape
+    rgb_mask = np.zeros((h, w, 3), dtype='uint8')
     for i in range(3):
-        mask_rgb[:, :, i] = mask[:, :, 0]
-    return mask_rgb * 255
+        rgb_mask[:, :, i] = binary_mask[:, :, 0]
+    return rgb_mask * 255
 
-def cut_out_image(img, mask):
-    """Turns every pixel in the image not in the mask to (0, 0, 0) (black)"""
+def convert_mask_rgb2binary(rgb_mask):
+    """Goes from rgb (h, w, 3) -> binary (h, w, 1) where each pixel is 1 or 0.
+    
+    Args:
+        rgb_mask (numpy arr): rgb mask to convert
 
-    assert mask.shape == img.shape, "Error: Image and mask must be the same shape"
-    h, w, _ = mask.shape
-    mask = mask.astype('uint8')
+    Returns:
+        binary_mask (np array): binary rgb mask
+    """
+
+    h, w, _ = rgb_mask.shape
+
+    rgb_mask = np.max(rgb_mask, axis=2)
+
+    ones = np.ones((h, w))
+    binary_mask = ones <= rgb_mask
+    
+    binary_mask = np.expand_dims(binary_mask, axis=2)
+   
+
+    return binary_mask
+
+def cut_out_image(img, rgb_mask):
+    """Turns every pixel in the image not in the mask to (0, 0, 0) (black).
+    
+    Args:
+        img (np.array): img to process
+        mask (np.array): rgb format mask
+        
+    Returns:
+        img (np.array): img with all pixels not in the mask set to black"""
+
+    assert rgb_mask.shape == rgb_mask.shape, "Error: Image and mask must be the same shape"
+    h, w, _ = rgb_mask.shape
+    rgb_mask = rgb_mask.astype('uint8')
 
     for r in range(h):
         for c in range(w):
-            if mask[r, c, 0] == False:
+            if rgb_mask[r, c, 0] == False:
                 img[r, c, :] *= 0
     
     return img
 
-def resize_and_pad(img_path,
-                   resized_img_save_path,
-                   downsample_size,
-                   final_size):
-    """Function not finished, but sample code for something similar is below."""
-    resized_img = cv2.imread('/home/grayson/Desktop/Code/ForkGAN/datasets/alderley/testA/day_mask_4112.png')
-    resized_img = cv2.resize(resized_img, (128, 128))
-    left_add = np.zeros((128, 128, 3))
-    resized_img = np.concatenate((left_add, resized_img), axis=1)
+def visualize_coco_labelled_img(img_path, annotations):
+    """Show the bounding boxes of a labelled coco image. Assumes the
+    annotations are in coco format (meaning bboxes are xywh).
+    
+    Parameters
+        img_path (str): path to the labelled image
+        annotations (list): list of annotation dictionaries corresponding to
+         the labelled img
+         
+    Returns
+        None
+    """
 
-    bottom_add = np.zeros((128, 256, 3))
-    resized_img = np.concatenate((resized_img, bottom_add), axis=0)
+    # ensure the img_path is only the img file extension
+    img_path = img_path.split('/')[-3:]
 
-    cv2.imshow('what', resized_img)
-    cv2.waitKey(5000)
+    base_path = os.environ.get('WALARIS_MAIN_DATA_PATH')
+
+    full_img_path = os.path.join(base_path,
+                                 'Images',
+                                 img_path[0],
+                                 img_path[1],
+                                 img_path[2])
+    
+    # make sure the image can be found on the machine
+    assert os.path.exists(full_img_path), "Error: Image not found on machine."
+
+    # read img
+    img = cv2.imread(full_img_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # get the bboxes
+    bboxes = []
+    class_labels = []
+    for annotation in annotations:
+        bboxes.append(annotation['bbox'])
+        class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation['category_id']])
+
+    fig, ax = plt.subplots()
+    ax.imshow(img)
+
+    # plot bboxes on image
+    show_bboxes(bboxes, ax, bbox_format='xywh', labels=class_labels)
+    plt.show()
+
+    return
+
+def visualize_coco_ground_truth_dataset(json_file):
+    """Randomly visualize images and labels from a dataset in the format of the
+    ground truth coco dataset. This can be used to test and visualize sampled
+    datasets.
+
+    Args:
+        json_file (str): path to ground truth dataset .json file
+
+    Returns:
+    
+    """
+    with open(json_file, 'r') as file:
+        data = json.load(file)
+
+    images = data['images']
+    annotations = data['annotations']
+
+    # sort the annotations to easily collect all annotations with a specific
+    # instance ID
+    annotations = sorted(annotations, key=lambda x: x['image_id'])
+
+    base_image_path = os.environ.get('WALARIS_MAIN_DATA_PATH', )
+
+    while 1:
+        # get image information to predict
+        idx = np.random.randint(0, len(images))
+        img_path_ext = images[idx]['file_name']
+
+        # if image is not saved on machine, continue
+        full_path = os.path.join(base_image_path, 
+                                 'Images',
+                                 img_path_ext)
+        if not os.path.exists(full_path):
+            print(f'Skipping: Image not found on machine..')
+            continue
+        target_img_id = images[idx]['id']
+
+        # get all of the annotations with this image id
+
+        # binary search to find annotation
+        l_ptr = 0
+        r_ptr = len(annotations)
+
+        idx = -1
+        while l_ptr < r_ptr:
+            mid = int(r_ptr - l_ptr - 1) // 2 + l_ptr
+            current_img_id = annotations[mid]['image_id']
+            if current_img_id == target_img_id:
+                idx = mid
+                break
+            elif current_img_id > target_img_id:
+                r_ptr = mid - 1
+            else:
+                l_ptr = mid + 1
+
+        if idx == -1:
+            print("No annotations found for this image. Continuing..")
+            img = cv2.imread(full_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            plt.imshow(img)
+            plt.show()
+            continue
+
+        # look to the left and to the right to get all of the annotations with
+        # the same image id
+        curr_img_annotations = []
+        ptr = idx
+        while(ptr >= 0
+              and annotations[ptr]['image_id'] == target_img_id):
+            curr_img_annotations.append(annotations[ptr])
+            ptr -= 1
+        ptr = idx+1
+        while(ptr < len(annotations)
+              and annotations[ptr]['image_id'] == target_img_id):
+            curr_img_annotations.append(annotations[ptr])
+            ptr += 1
+
+        # visualize the image
+        visualize_coco_labelled_img(full_path, curr_img_annotations)
+
+def visualize_coco_results(results_json_file,
+                           id2img_path_json_file):
+    """Randomly visualize images and labels from a dataset in the coco results 
+    format. This can be used to test and visualize sampled datasets.
+
+    Args:
+        json_file (str): path to ground truth dataset .json file
+
+    Returns:
+    
+    """
+    with open(results_json_file, 'r') as file:
+        data = json.load(file)
+
+    with open(id2img_path_json_file, 'r') as file:
+        id2img_path = json.load(file)
+    
+    annotations = data
+    print(len(id2img_path))
+    # sort the annotations to easily collect all annotations with a specific
+    # instance ID
+    annotations = sorted(annotations, key=lambda x: x['image_id'])
+
+    base_image_path = os.environ.get('WALARIS_MAIN_DATA_PATH', )
+
+    while 1:
+        # get image information to predict
+        idx = np.random.randint(0, len(annotations))
+        img_id = str(annotations[idx]['image_id'])
+        if img_id not in id2img_path:
+            print('ID not in id2img_path...')
+            continue
+        img_path_ext = id2img_path[img_id]
+
+        # if image is not saved on machine, continue
+        full_path = os.path.join(base_image_path, 
+                                 'Images',
+                                 img_path_ext)
+        if not os.path.exists(full_path):
+            print(f'Skipping: Image not found on machine..')
+            continue
+        target_img_id = annotations[idx]['image_id']
+
+        # get all of the annotations with this image id
+
+        # look to the left and to the right to get all of the annotations with
+        # the same image id
+        curr_img_annotations = []
+        ptr = idx
+        while(annotations[ptr]['image_id'] == target_img_id):
+            curr_img_annotations.append(annotations[ptr])
+            ptr -= 1
+        ptr = idx+1
+        while(annotations[ptr]['image_id'] == target_img_id):
+            curr_img_annotations.append(annotations[ptr])
+            ptr += 1
+
+        # visualize the image
+        visualize_coco_labelled_img(full_path, curr_img_annotations)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### These are more specific functions and likely won't have much use outside of
+### their projects. Should remove eventually.
 
 def refine_thermal_mask(img, mask):
     """Takes in an image of a thermal cutout on a black background and it's 
@@ -171,7 +350,7 @@ def refine_thermal_mask(img, mask):
 
     # if mask is in rgb form, move to binary form
     if mask_channels != 1:
-        mask = get_binary_from_rgb_mask(mask)
+        mask = convert_mask_binary2rgb(mask)
 
     # get the average pixel value and define the threshold
     total_num_pxls = np.sum(mask)
@@ -189,22 +368,6 @@ def refine_thermal_mask(img, mask):
                 mask[i, j] = 0
 
     return img, mask
-
-def get_binary_from_rgb_mask(rgb_mask):
-    """Takes in an image that is rgb where each pixel is either (0, 0, 0) black
-    or (255, 255, 255) white."""
-
-    h, w, _ = rgb_mask.shape
-
-    rgb_mask = np.max(rgb_mask, axis=2)
-
-    ones = np.ones((h, w))
-    binary_mask = ones <= rgb_mask
-    
-    binary_mask = np.expand_dims(binary_mask, axis=2)
-   
-
-    return binary_mask
 
 def ooi_fuse_v1(ooi,
              global_img):

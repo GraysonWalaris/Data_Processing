@@ -22,7 +22,7 @@ def random_crop(img,
     """
     Randomly crop an image to create a new data sample.
 
-        Parameters:
+        Args:
             img (numpy arr): Numpy array of image file in the form (h, w, 3)
             crop_size (tuple): (h, w) of the cropped image
 
@@ -204,13 +204,13 @@ def random_crop_around_bbox_v2(img,
     Randomly crop an image to create a new data sample, translate bounding box
       to new image size.
 
-        Parameters:
+        Args:
             img (numpy arr): Numpy array of image file in the form (h, w, 3)
             crop_size (tuple): (h, w) of the cropped image
             space_from_edge (int): Number of pixels from the edge the bounding
-             box must be after the random crop.
+                box must be after the random crop.
             return_masks (bool): If true, will utilize the segment anything
-             model to produce masks for the object of interest and return them.
+                model to produce masks for the object of interest and return them.
             bbox_w_lim (tuple): (min bbox width, max bbox width)
             bbox_h_lim (tuple): (min bbox height, max bbox height)
             bbox_area_lim (tuple): (min bbox area, max bbox area)
@@ -219,7 +219,7 @@ def random_crop_around_bbox_v2(img,
             cropped_image (np.array): Cropped image
             new_bbox (list): Bbox translated to fit the cropped image
             masks (tensor): None if return_masks==False. Else, Tensor of masks 
-             from the crop in the image.
+                from the crop in the image.
     """
     cropped_height, cropped_width = crop_size
 

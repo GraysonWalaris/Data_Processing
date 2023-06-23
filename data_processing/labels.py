@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import random
 
 IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
                                 'Images')
@@ -246,10 +247,23 @@ MAPPING_WALARIS_TO_COCO = {
 }
 
 MAPPING_COCO_TO_WALARIS = {
-
+    # in progress
 }
 
+# Functions for labels and datasets in the Walaris format
+
 def get_img_info(label_path, img_name):
+    """Return the img_info dictionary corresponding to a img_name in a label
+    file.
+    
+    Args:
+        label_path (str): path to the label .json file
+        img_name (str): name of the image to get the img info for
+
+    Returns:
+        img_info (dict): walaris img info dictionary
+    """
+
     # if img_name is pass with .png or .jpg extension, remove it
     img_name = img_name.split('.')[0]
 
@@ -261,12 +275,6 @@ def get_img_info(label_path, img_name):
             return None
 
     return img_info
-
-def get_labels_from_json(json_file):
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-    
-    return data
 
 def get_random_label_helper(data_type_folder, data_split, class_type):
     """Helper function for the get_random_label function. This returns None 
@@ -307,7 +315,8 @@ def get_random_label_helper(data_type_folder, data_split, class_type):
     labels_json_file = label_files[idx]
 
     # get dictionary of labels
-    labels = get_labels_from_json(labels_json_file)
+    with open(labels_json_file, 'r') as f:
+        labels = json.load(f)
 
     # get random image name
     labels_list = list(labels)
@@ -326,7 +335,7 @@ def get_random_label(data_type='all',
     """Provide the image information from a random image from the 
     Tarsier_Main_Dataset.
 
-    Parameters:
+    Args:
         data_type (str): Specifies the type of data (ie thermal).
         data_split (str): Specifies train, val, or whole data split.
         class_type (str): Specifies which class of object to include in random
@@ -402,7 +411,8 @@ def get_random_label(data_type='all',
     labels_json_file = label_files[idx]
 
     # get dictionary of labels
-    labels = get_labels_from_json(labels_json_file)
+    with open(labels_json_file, 'r') as f:
+        labels = json.load(f)
 
     # get random image name
     labels_list = list(labels)
@@ -414,17 +424,16 @@ def get_random_label(data_type='all',
    
     return img_info
 
-def get_img_from_img_info(img_info):
-    img = cv2.imread(os.path.join(IMAGES_BASE_PATH, img_info['image_path']))
-
-    return img
-
 def save_dict_to_json(json_file_path, dictionary, delete=False):
     """Adds dictionary to a json file. Creates a new file if it does not exist.
 
-    Parameters:
+    Args:
         label_file_path (str): path to label file
         label (dict): label dictionary to add to the json file
+        delete (bool): If true, deletes any information that was already stored
+            in the json file.
+    Returns:
+
     """
 
     if os.path.exists(json_file_path):
@@ -449,12 +458,12 @@ def test_label(label_file, img_name):
     the bounding boxes superimposed on the image. Will be used to verify the 
     labels. The label file is assumed to be in the Walaris standard format.
     
-    Parameters:
+    Args:
         label_file (str): path to the label file
         img_name (str): name of the image you wish to test
         
     Returns:
-        None
+        
     """
 
     # get the img_info dict from labels file
@@ -501,7 +510,7 @@ def test_label(label_file, img_name):
 def create_labels(bboxes, class_labels):
     """ Creates a list of bbox labels with class_label information
 
-    Parameters:
+    Args:
         bboxes (list): list of bounding boxes in an image
         class_labels (list): list of class labels in an image that correspond
          in order to the list of bounding boxes
@@ -521,7 +530,7 @@ def create_labels(bboxes, class_labels):
     for idx in range(len(bboxes)):
         bbox = bboxes[idx]
         category_name = class_labels[idx]
-        category_id = WALARIS_CLASS_LABELS[category_name]
+        category_id = WALARIS_CLASS_LABELS_NAME2NUM[category_name]
 
         labels.append({
             'bbox': bbox,
@@ -531,10 +540,10 @@ def create_labels(bboxes, class_labels):
 
     return labels
 
-def create_img_info(img_path, bboxes, class_labels):
+def create_walaris_img_info(img_path, bboxes, class_labels):
     """Creates an image info dictionary in the Walaris standard format.
 
-    Parameters:
+    Args:
         img_path (str): file path of the image
         bboxes (list): list of bounding boxes for the objects detected in the
          image
@@ -565,13 +574,11 @@ def create_img_info(img_path, bboxes, class_labels):
 
     return img_info, img_name.split('.')[0]
 
-
-
-def get_img_info_from_img_name(img_name):
+def get_walaris_img_info_from_img_name(img_name):
     """Given a string of the name of the image (ie. thermal_uav_574_000058.png)
     returns a dictionary with the image information.
      
-    Parameters:
+    Args:
         img_name (str): name of the image to get the label for
      
     Returns:
@@ -606,3 +613,183 @@ def get_img_info_from_img_name(img_name):
     img_info = get_img_info(labels_json_file, img_name)
    
     return img_info
+
+def get_rand_sample_from_coco_json(original_json_file,
+                                     new_json_file,
+                                     sample_size,
+                                     seed=None,
+                                     include_unlabelled_images=False):
+    """ Randomly sample a coco format dataset from a coco format dataset.
+
+    Args:
+        original_json_file (str): file path of json file to sample from
+        new_json_file (str): file path to the new random sample json file
+        sample_size (int): number of samples in the random sample
+        seed (int): pass a seed for reproducability
+        include_unlabelled_images (bool): If False, check to make sure that
+            sampled images have annotations in them before adding them to the
+            sample.
+
+    Returns:
+
+    """
+
+    def get_annotations_by_img_id(annotations,
+                                  target_img_id):
+        """ Gets a list of annotations that correspond to a specific img_id.
+        
+        Args:
+            annotations (list(dict)): a list of annotation dicts from a coco
+                format dataset
+            img_id (int or str): image id to match annotations to
+            
+        Returns:
+            matching_annotations (list(dict)): a list of annotations with
+                img_ids that match the target_img_id
+        """
+
+        # binary search for image id match in annotations
+        l_ptr = 0
+        r_ptr = len(annotations)
+        
+        target_img_id = int(target_img_id)
+
+        idx = -1
+        while l_ptr < r_ptr:
+            mid = int(r_ptr - l_ptr - 1) // 2 + l_ptr
+            current_img_id = int(annotations[mid]['image_id'])
+            if current_img_id == target_img_id:
+                idx = mid
+                break
+            elif current_img_id > target_img_id:
+                r_ptr = mid - 1
+            else:
+                l_ptr = mid + 1
+
+        if idx == -1:
+            return None
+
+        # look to the left and to the right to get all of the annotations with
+        # the same image id
+        matching_annotations = []
+        ptr = idx
+        while(ptr >= 0
+            and annotations[ptr]['image_id'] == target_img_id):
+            matching_annotations.append(annotations[ptr])
+            ptr -= 1
+        ptr = idx+1
+        while(ptr < len(annotations)
+            and annotations[ptr]['image_id'] == target_img_id):
+            matching_annotations.append(annotations[ptr])
+            ptr += 1
+
+        return matching_annotations
+            
+
+    with open(original_json_file, 'r') as file:
+        data =json.load(file)
+
+    images = data['images']
+    annotations = data['annotations']
+
+    # sort the annotations by image id for binary search later in algorithm
+    annotations = sorted(annotations, key=lambda x: x['image_id'])
+
+    if not include_unlabelled_images:
+        # remove images without annotations (there are no detections on some images)
+        l_ptr = r_ptr = 0
+        while r_ptr < len(images):
+            target_img_id = images[r_ptr]['id']
+            matching_annotations = get_annotations_by_img_id(annotations,
+                                                             target_img_id)
+            if matching_annotations is not None:
+                images[l_ptr], images[r_ptr] = images[r_ptr], images[l_ptr]
+                l_ptr += 1
+            
+            r_ptr += 1
+        
+        images = images[:l_ptr]
+    
+    # use a seed for reproducability if specified
+    if seed is not None:
+        random.seed(seed)
+    
+    random.shuffle(images)
+
+    sampled_images = images[:sample_size]
+    sampled_img_annotations = []
+    for img_dict in sampled_images:
+        target_img_id = img_dict['id']
+
+        # binary search for image id match in annotations
+        l_ptr = 0
+        r_ptr = len(annotations)
+
+        idx = -1
+        while l_ptr < r_ptr:
+            mid = int(r_ptr - l_ptr - 1) // 2 + l_ptr
+            current_img_id = annotations[mid]['image_id']
+            if current_img_id == target_img_id:
+                idx = mid
+                break
+            elif current_img_id > target_img_id:
+                r_ptr = mid - 1
+            else:
+                l_ptr = mid + 1
+
+        if idx == -1:
+            print("Error: No annotations found for this image. Continuing..")
+            continue
+
+        # look to the left and to the right to get all of the annotations with
+        # the same image id
+        ptr = idx
+        while(ptr >= 0
+              and annotations[ptr]['image_id'] == target_img_id):
+            sampled_img_annotations.append(annotations[ptr])
+            ptr -= 1
+        ptr = idx+1
+        while(ptr < len(annotations)
+              and annotations[ptr]['image_id'] == target_img_id):
+            sampled_img_annotations.append(annotations[ptr])
+            ptr += 1
+
+    data['images'] = sampled_images
+    data['annotations'] = sampled_img_annotations
+
+    with open(new_json_file, 'w') as file:
+        json.dump(data, file)
+
+    return
+
+def print_category_info_coco_format(json_file,
+                                    label_convention):
+    """Print out information in the terminal regarding the categories found and 
+    number of categories in a coco ground truth or results dataset.
+    
+    Args:
+        json_file (str): file path to the json folder to read from
+        label_convention (str): specify which label convention the data is
+            using
+
+    Returns:
+
+    """
+    with open(json_file, 'r') as file:
+        data = json.load(file)
+
+    annotations = data['annotations']
+    class_labels_present = dict()
+
+    for annotation in annotations:
+        if annotation['category_id'] not in class_labels_present:
+            class_labels_present[annotation['category_id']] = 1
+        else:
+            class_labels_present[annotation['category_id']] += 1
+
+    for class_label in class_labels_present:
+        if label_convention == 'walaris':
+            print(f'{class_label}: {WALARIS_CLASS_LABELS_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
+        elif label_convention == 'coco':
+            print(f'{class_label}: {COCO_CLASSES_DICT_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
+    return

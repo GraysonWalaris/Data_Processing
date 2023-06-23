@@ -45,6 +45,7 @@ def superimpose_masks_and_bboxes(image, masks, bboxes):
     plt.show()
     
 def load_sam_model():
+    """Load the sam model"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     if device == 'cuda':

@@ -15,11 +15,28 @@ from tqdm import tqdm
 import io
 
 class OOI_Blender:
-    def __init__(self, **kwargs):
-        self.data_type = kwargs.get('data_type', 'thermal')
-        self.class_type = kwargs.get('class_type', 'all')
-        self.data_split = kwargs.get('data_split', 'whole')
-        self.multi_object_param = kwargs.get('multi_object_param', .3)
+    """Class for blending objects of interest taken from the Walaris dataset
+    into images.
+    
+    Args:
+        data_type (str): specify the type of data you wish to get objects of
+            interest from
+        class_type (str): specify the class type (ie airplane, uav, etc) that
+            you wish to get objects of interest from
+        data_split (str): specify whether you want to take objects of interest
+            from the training, validation, testing, or whole data splits
+        multi_object_param (float): specify the likelihood that more than one
+            object of interest will be blended into the source image
+    """
+    def __init__(self, 
+                 data_type='thermal',
+                 class_type='all',
+                 data_split='whole',
+                 multi_object_param=.3):
+        self.data_type = data_type
+        self.class_type = class_type
+        self.data_split = data_split
+        self.multi_object_param = multi_object_param
 
     def blend_ooi_to_backgrounds(self, 
                                  num_samples,
@@ -31,20 +48,21 @@ class OOI_Blender:
                                  multi_object_param=None):
         """Blends objects of interest into background images.
         
-        Parameters
+        Args:
             num_samples (int): number of new images to create and save
             background_folder (str): file path to the folder of backgrounds to
-             blend ooi into
+                blend ooi into
             experiment_name (str): this is the name of the folder that the images
-             will be saved to within the Tarsier_Main_Dataset
+                will be saved to within the Tarsier_Main_Dataset
             save_path (str): folder to save blended images to (if not specified,
-             will automatically add images to the correct locations in the 
-             Tarsier_Main_Dataset)
+                will automatically add images to the correct locations in the 
+                Tarsier_Main_Dataset)
             visualize (bool): if true, visualizes the process (helps with debugging)
             multi_object_param (float b/w 0 and 1): percentage chance to add
-             another object to a background (add multiple ooi in one background
-             image)
-        Returns
+                another object to a background (add multiple ooi in one background
+                image)
+        
+        Returns:
 
         """
         if multi_object_param is None:
@@ -301,26 +319,6 @@ class OOI_Blender:
                 # not sure what causes this error, but if x2 < x1 or y2 < y1 skip
                 return None, None, None, None
 
-                for i in range(mask.shape[0]-buffer):
-                    if np.sum(mask[i+buffer, :]) > 0:
-                        y1 = i
-                        break
-
-                for i in range(mask.shape[1]-buffer):
-                    if np.sum(mask[:, i+buffer]) > 0:
-                        x1 = i
-                        break
-
-                for i in reversed(range(mask.shape[0] - buffer)):
-                    if np.sum(mask[i-buffer, :]) > 0:
-                        y2 = i
-                        break
-                
-                for i in reversed(range(mask.shape[1] - buffer)):
-                    if np.sum(mask[:, i-buffer]) > 0:
-                        x2 = i
-                        break
-
             return x1, y1, x2, y2
         
         x1, y1, x2, y2 = get_bbox_from_mask(mask, buffer)
@@ -372,7 +370,7 @@ class OOI_Blender:
     def _save_label(self, label_file_path: str, img_info: dict , img_name: str) -> None:
         """Adds label to a json file. Creates a new file if it does not exist.
 
-        Parameters:
+        Args:
             label_file_path (str): path to label file
             label (dict): label dictionary to add to the json file
             in the form:
@@ -381,6 +379,9 @@ class OOI_Blender:
                 'image_path': image_path,
                 'original_image_path': original_image_path
             }
+
+        Returns:
+
         """
 
         label = {img_name.split('/')[-1] : img_info}
