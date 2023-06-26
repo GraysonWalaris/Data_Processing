@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import random
+from tqdm import tqdm
 
 IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
                                 'Images')
@@ -251,6 +252,60 @@ MAPPING_COCO_TO_WALARIS = {
 }
 
 # Functions for labels and datasets in the Walaris format
+
+def get_img_paths(exclude_synthetic=True):
+    """Get a python set of all relative image paths for the entire dataset.
+    
+    Args:
+        exclude_synthetic (bool): if true, will not include the image paths to 
+            synthetic images
+
+    Returns:
+
+    """
+    
+    img_paths = set()
+
+    # get a list of all image paths in labels
+    for data_type_folder in tqdm(glob.glob(LABELS_BASE_PATH+'/*')):
+
+        # skip synthetic data if specified
+        if 'synthetic' in data_type_folder and exclude_synthetic:
+            continue
+
+        # loop through each object type folder in the 'whole' directory
+        for object_type_folder in glob.glob(data_type_folder+'/whole/*'):
+
+            # loop through each label and add the image path to set
+            for label_json_file in glob.glob(object_type_folder+'/*'):
+
+                # load the label information
+                with open(label_json_file, 'r') as file:
+                    label_info_dict = json.load(file)
+
+                # loop through all images in the label info dictionary and add 
+                # the image path to the set
+                for img_label in label_info_dict:
+                    img_paths.add(label_info_dict[img_label]['image_path'])
+
+        # the day data has a unique label directory called 'test'. Loop through
+        # this if the data_type_folder is 'day'
+        if 'day' in data_type_folder:
+            for object_type_folder in glob.glob(data_type_folder+'/test_(not_included_in_whole)/*'):
+
+                # loop through each label and add the image path to set
+                for label_json_file in glob.glob(object_type_folder+'/*'):
+
+                    # load the label information
+                    with open(label_json_file, 'r') as file:
+                        label_info_dict = json.load(file)
+
+                    # loop through all images in the label info dictionary and add 
+                    # the image path to the set
+                    for img_label in label_info_dict:
+                        img_paths.add(label_info_dict[img_label]['image_path'])
+
+    return img_paths
 
 def get_img_info(label_path, img_name):
     """Return the img_info dictionary corresponding to a img_name in a label
