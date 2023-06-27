@@ -3,6 +3,10 @@ This repository is used to collect data for training of various AI algorithms at
 
 # Setup
 
+## FPIE Dependencies
+Some functions rely on the fpie package. In order to build the .whl file for the fpie package, you must first install the extenstions required. To do so, go to the official fpie package repository and ensure that all of the extensions specified in the README are installed.
+* Make sure to install cmake and gcc, as these will be necessary to build fpie when pip installing the data_processing library.*
+
 ## Environment Setup
 To install this, it is recommended to use virtual environments. (For this tutorial I will be using anaconda, but any virtual environment manager will do.)
 
