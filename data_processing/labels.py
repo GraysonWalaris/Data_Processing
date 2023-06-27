@@ -202,7 +202,11 @@ WALARIS_CLASS_LABELS_NAME2NUM = {
     "train": 15,
     "truck": 16,
     "ufo": 17,
-    "helicopter": 18
+    "helicopter": 18,
+    "phantom": 19,
+    "mavic": 20,
+    "spark": 21,
+    "inspire": 22
 }
 
 WALARIS_CLASS_LABELS_NUM2NAME = {
@@ -224,6 +228,10 @@ WALARIS_CLASS_LABELS_NUM2NAME = {
     16: "truck",
     17: "ufo",
     18: "helicopter",
+    19: "phantom",
+    20: "mavic",
+    21: "spark",
+    22: "inspire"
 }
 
 MAPPING_WALARIS_TO_COCO = {
@@ -253,8 +261,9 @@ MAPPING_COCO_TO_WALARIS = {
 
 # Functions for labels and datasets in the Walaris format
 
-def get_img_paths(exclude_synthetic=True):
-    """Get a python set of all relative image paths for the entire dataset.
+def get_img_paths_walaris_format(exclude_synthetic=True):
+    """Get a python set of all relative image paths for the entire dataset from
+    the walaris standard format labels.
     
     Args:
         exclude_synthetic (bool): if true, will not include the image paths to 
@@ -668,6 +677,71 @@ def get_walaris_img_info_from_img_name(img_name):
     img_info = get_img_info(labels_json_file, img_name)
    
     return img_info
+
+def get_img_paths_coco_format(exclude_synthetic=True):
+    """Get a python set of all relative image paths for the entire dataset from
+    the walaris standard format labels.
+    
+    *note: you MUST have the following directory structure and naming 
+    convention. any labels folder (val, train, whole) MUST have a sister coco
+    folder with _COCO appended to the end of the folder name
+
+    |--Tarsier_Main_Dataset
+        |--Labels_NEW
+            |--day
+                |-- train
+                |--train_COCO
+                |--val
+                |--val_COCO
+                |--whole
+                |--whole_COCO
+            |--night
+            |--thermal
+            |--thermal_synthetic
+    
+    Args:
+        exclude_synthetic (bool): if true, will not include the image paths to 
+            synthetic images
+
+    Returns:
+    """
+
+    img_paths = set()
+
+    # get a list of all image paths in labels
+    for data_type_folder in tqdm(glob.glob(LABELS_BASE_PATH+'/*')):
+
+        # skip synthetic data if specified
+        if 'synthetic' in data_type_folder and exclude_synthetic:
+            continue
+
+        # loop through each object type folder in the 'whole' directory
+        for label_json_file in glob.glob(data_type_folder+'/whole_COCO/*.json'):
+
+            # load the label information
+            with open(label_json_file, 'r') as file:
+                label_info_dict = json.load(file)
+
+            # loop through all img dicts and add the relative file name to 
+            # the set
+            for img in label_info_dict['images']:
+                img_paths.add(img['file_name'])
+
+        # the day data has a unique label directory called 'test'. Loop through
+        # this if the data_type_folder is 'day'
+        if 'day' in data_type_folder:
+            for label_json_file in glob.glob(data_type_folder+'/test_(not_included_in_whole)_COCO/*.json'):
+
+                # load the label information
+                with open(label_json_file, 'r') as file:
+                    label_info_dict = json.load(file)
+
+                # loop through all img dicts and add the relative file name to 
+                # the set
+                for img in label_info_dict['images']:
+                    img_paths.add(img['file_name'])
+
+    return img_paths
 
 def get_rand_sample_from_coco_json(original_json_file,
                                      new_json_file,

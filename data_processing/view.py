@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import json
 
-from labels import COCO_CLASSES_DICT_NUM2NAME, COCO_CLASSES_DICT_NAME2NUM
+from .labels import COCO_CLASSES_DICT_NUM2NAME, COCO_CLASSES_DICT_NAME2NUM, WALARIS_CLASS_LABELS_NUM2NAME
 
 def show_bboxes(boxes, ax, bbox_format: str, labels=None):
     """Displays an image with bounding boxes and labels drawn.
@@ -129,14 +129,18 @@ def cut_out_image(img, rgb_mask):
     
     return img
 
-def visualize_coco_labelled_img(img_path, annotations):
+def visualize_coco_labelled_img(img_path,
+                                annotations,
+                                label_convention):
     """Show the bounding boxes of a labelled coco image. Assumes the
     annotations are in coco format (meaning bboxes are xywh).
     
-    Parameters
+    Args:
         img_path (str): path to the labelled image
         annotations (list): list of annotation dictionaries corresponding to
-         the labelled img
+            the labelled img
+        label_convention (str): what label conventions are the annotations
+            using? (walaris or coco supported)
          
     Returns
         None
@@ -165,7 +169,10 @@ def visualize_coco_labelled_img(img_path, annotations):
     class_labels = []
     for annotation in annotations:
         bboxes.append(annotation['bbox'])
-        class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation['category_id']])
+        if label_convention == 'coco':
+            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation['category_id']])
+        elif label_convention == 'walaris':
+            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[annotation['category_id']])
 
     fig, ax = plt.subplots()
     ax.imshow(img)
@@ -176,13 +183,16 @@ def visualize_coco_labelled_img(img_path, annotations):
 
     return
 
-def visualize_coco_ground_truth_dataset(json_file):
+def visualize_coco_ground_truth_dataset(json_file,
+                                        label_convention):
     """Randomly visualize images and labels from a dataset in the format of the
     ground truth coco dataset. This can be used to test and visualize sampled
     datasets.
 
     Args:
         json_file (str): path to ground truth dataset .json file
+        label_convention (str): what label conventions are the annotations
+            using? (walaris or coco supported)
 
     Returns:
     
@@ -254,15 +264,20 @@ def visualize_coco_ground_truth_dataset(json_file):
             ptr += 1
 
         # visualize the image
-        visualize_coco_labelled_img(full_path, curr_img_annotations)
+        visualize_coco_labelled_img(full_path, curr_img_annotations, label_convention)
 
 def visualize_coco_results(results_json_file,
-                           id2img_path_json_file):
+                           id2img_path_json_file,
+                           label_convention):
     """Randomly visualize images and labels from a dataset in the coco results 
     format. This can be used to test and visualize sampled datasets.
 
     Args:
         json_file (str): path to ground truth dataset .json file
+        id2img_path_json_file (str): path to the json file that holds a
+            a dictionary of img_ids and their corresponding img paths
+        label_convention (str): what label conventions are the annotations
+            using? (walaris or coco supported)
 
     Returns:
     
@@ -305,16 +320,16 @@ def visualize_coco_results(results_json_file,
         # the same image id
         curr_img_annotations = []
         ptr = idx
-        while(annotations[ptr]['image_id'] == target_img_id):
+        while(ptr > 0 and annotations[ptr]['image_id'] == target_img_id):
             curr_img_annotations.append(annotations[ptr])
             ptr -= 1
         ptr = idx+1
-        while(annotations[ptr]['image_id'] == target_img_id):
+        while(ptr < len(annotations) and annotations[ptr]['image_id'] == target_img_id):
             curr_img_annotations.append(annotations[ptr])
             ptr += 1
 
         # visualize the image
-        visualize_coco_labelled_img(full_path, curr_img_annotations)
+        visualize_coco_labelled_img(full_path, curr_img_annotations, label_convention)
 
 
 
