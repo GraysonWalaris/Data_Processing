@@ -517,60 +517,6 @@ def save_dict_to_json(json_file_path, dictionary, delete=False):
 
     return
 
-def test_label(label_file, img_name):
-    """Given the image name and label file, show the image on the screen with
-    the bounding boxes superimposed on the image. Will be used to verify the 
-    labels. The label file is assumed to be in the Walaris standard format.
-    
-    Args:
-        label_file (str): path to the label file
-        img_name (str): name of the image you wish to test
-        
-    Returns:
-        
-    """
-
-    # get the img_info dict from labels file
-    with open(label_file, 'r') as file:
-        data = json.load(file)
-
-    img_info = data[img_name]
-
-    # read the image
-    img_path = os.path.join(IMAGES_BASE_PATH, img_info['image_path'])
-    img = cv2.imread(img_path)
-
-    # get a list of bboxes from the label
-    bboxes = []
-    class_labels = []
-
-    for label in img_info['labels']:
-        bboxes.append(label['bbox'])
-        class_labels.append(label['category_name'])
-
-    # loop through each bounding box and superimpose it on the image
-    for idx in range(len(bboxes)):
-        x1, y1, x2, y2 = bboxes[idx]
-        start_point = (int(x1), int(y1))
-        end_point = (int(x2), int(y2))
-        cv2.rectangle(img, start_point, end_point, 
-                      color=(0, 0, 255), thickness=1)
-        cv2.putText(
-            img,
-            class_labels[idx],
-            (int(x1), int(y1)-10),
-            fontFace = cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale = 0.6,
-            color = (0, 255, 0),
-            thickness=2
-        )
-
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
- 
-    plt.figure('label test')
-    plt.imshow(img)
-    plt.show()
-
 def create_labels(bboxes, class_labels):
     """ Creates a list of bbox labels with class_label information
 
