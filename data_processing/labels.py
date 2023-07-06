@@ -12,6 +12,91 @@ IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
 LABELS_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'), 
                                 'Labels_NEW')
 
+# the COCO paper uses the below classes. the coco dataset uses an expanded version
+COCO_CLASSES_PAPER = [
+   "person",
+   "bicycle",
+   "car",
+   "motorcycle",
+   "airplane",
+   "bus",
+   "train",
+   "truck",
+   "boat",
+   "traffic_light",
+   "fire_hydrant",
+   "stop_sign",
+   "parking_meter",
+   "bench",
+   "bird",
+   "cat",
+   "dog",
+   "horse",
+   "sheep",
+   "cow",
+   "elephant",
+   "bear",
+   "zebra",
+   "giraffe",
+   "backpack",
+   "umbrella",
+   "handbag",
+   "tie",
+   "suitcase",
+   "frisbee",
+   "skis",
+   "snowboard",
+   "sports_ball",
+   "kite",
+   "baseball_bat",
+   "baseball_glove",
+   "skateboard",
+   "surfboard",
+   "tennis_racket",
+   "bottle",
+   "wine_glass",
+   "cup",
+   "fork",
+   "knife",
+   "spoon",
+   "bowl",
+   "banana",
+   "apple",
+   "sandwich",
+   "orange",
+   "broccoli",
+   "carrot",
+   "hot_dog",
+   "pizza",
+   "donut",
+   "cake",
+   "chair",
+   "couch",
+   "potted_plant",
+   "bed",
+   "dining_table",
+   "toilet",
+   "tv",
+   "laptop",
+   "mouse",
+   "remote",
+   "keyboard",
+   "cell_phone",
+   "microwave",
+   "oven",
+   "toaster",
+   "sink",
+   "refrigerator",
+   "book",
+   "clock",
+   "vase",
+   "scissors",
+   "teddy_bear",
+   "hair_drier",
+   "toothbrush",
+]
+
+# these are the coco classes used by the official coco dataset
 COCO_CLASSES = [
     "person",
     "bicycle",
@@ -24,6 +109,7 @@ COCO_CLASSES = [
     "boat",
     "traffic_light",
     "fire_hydrant",
+    "street_sign",
     "stop_sign",
     "parking_meter",
     "bench",
@@ -37,8 +123,11 @@ COCO_CLASSES = [
     "bear",
     "zebra",
     "giraffe",
+    "hat",
     "backpack",
     "umbrella",
+    "shoe",
+    "eye_glasses",
     "handbag",
     "tie",
     "suitcase",
@@ -53,6 +142,7 @@ COCO_CLASSES = [
     "surfboard",
     "tennis_racket",
     "bottle",
+    "plate",
     "wine_glass",
     "cup",
     "fork",
@@ -73,8 +163,12 @@ COCO_CLASSES = [
     "couch",
     "potted_plant",
     "bed",
+    "mirror",
     "dining_table",
+    "window",
+    "desk",
     "toilet",
+    "door",
     "tv",
     "laptop",
     "mouse",
@@ -86,6 +180,7 @@ COCO_CLASSES = [
     "toaster",
     "sink",
     "refrigerator",
+    "blender",
     "book",
     "clock",
     "vase",
@@ -93,13 +188,22 @@ COCO_CLASSES = [
     "teddy_bear",
     "hair_drier",
     "toothbrush",
+    "hairbrush"
 ]
 
+# get the dict name2num for the coco dataset classes
 COCO_CLASSES_DICT_NAME2NUM = {}
 COCO_CLASSES_DICT_NUM2NAME = {}
 for num, class_type in enumerate(COCO_CLASSES):
-    COCO_CLASSES_DICT_NAME2NUM[class_type] = num
-    COCO_CLASSES_DICT_NUM2NAME[num] = class_type
+    COCO_CLASSES_DICT_NAME2NUM[class_type] = num+1
+    COCO_CLASSES_DICT_NUM2NAME[num+1] = class_type
+
+# get the dict name2num for the coco paper classes
+COCO_CLASSES_DICT_NAME2NUM_PAPER_VERSION = {}
+COCO_CLASSES_DICT_NUM2NAME_PAPER_VERSION = {}
+for num, class_type in enumerate(COCO_CLASSES_PAPER):
+    COCO_CLASSES_DICT_NAME2NUM_PAPER_VERSION[class_type] = num+1
+    COCO_CLASSES_DICT_NUM2NAME_PAPER_VERSION[num+1] = class_type
 
 COCO_CATEGORIES = [
     {"supercategory": "person","id": 1,"name": "person"},
@@ -723,16 +827,16 @@ def get_rand_sample_from_coco_json(original_json_file,
                 img_ids that match the target_img_id
         """
 
-        # binary search for image id match in annotations
+        # binary search to find annotation
         l_ptr = 0
         r_ptr = len(annotations)
-        
+
         target_img_id = int(target_img_id)
 
         idx = -1
-        while l_ptr < r_ptr:
-            mid = int(r_ptr - l_ptr - 1) // 2 + l_ptr
-            current_img_id = int(annotations[mid]['image_id'])
+        while l_ptr <= r_ptr:
+            mid = int(r_ptr - l_ptr) // 2 + l_ptr
+            current_img_id = annotations[mid]['image_id']
             if current_img_id == target_img_id:
                 idx = mid
                 break
@@ -837,8 +941,9 @@ def get_rand_sample_from_coco_json(original_json_file,
 
     return
 
-def print_category_info_coco_format(json_file,
-                                    label_convention):
+def get_category_info_coco_format(json_file,
+                                  label_convention,
+                                  isPrint=False):
     """Print out information in the terminal regarding the categories found and 
     number of categories in a coco ground truth or results dataset.
     
@@ -861,10 +966,21 @@ def print_category_info_coco_format(json_file,
             class_labels_present[annotation['category_id']] = 1
         else:
             class_labels_present[annotation['category_id']] += 1
+    if isPrint:
+        num_images = len(data['images'])
+        print(f'{num_images} images in dataset...')
+        for class_label in class_labels_present:
+            if label_convention == 'walaris':
+                print(f'{class_label}: {WALARIS_CLASS_LABELS_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
+            elif label_convention == 'coco':
+                print(f'{class_label}: {COCO_CLASSES_DICT_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
 
+    class_labels_by_name = {}
     for class_label in class_labels_present:
+        num_object_present = class_labels_present[class_label]
         if label_convention == 'walaris':
-            print(f'{class_label}: {WALARIS_CLASS_LABELS_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
+                class_labels_by_name[WALARIS_CLASS_LABELS_NUM2NAME[class_label]] = num_object_present
         elif label_convention == 'coco':
-            print(f'{class_label}: {COCO_CLASSES_DICT_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
-    return
+            class_labels_by_name[COCO_CLASSES_DICT_NUM2NAME[class_label]] = num_object_present
+
+    return class_labels_by_name
