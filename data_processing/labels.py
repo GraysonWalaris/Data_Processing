@@ -793,6 +793,57 @@ def get_img_paths_coco_format(exclude_synthetic=True):
 
     return img_paths
 
+def get_annotations_by_img_id(annotations,
+                                  target_img_id):
+    """ Gets a list of annotations that correspond to a specific img_id.
+    
+    Args:
+        annotations (list(dict)): a list of annotation dicts from a coco
+            format dataset
+        img_id (int or str): image id to match annotations to
+        
+    Returns:
+        matching_annotations (list(dict)): a list of annotations with
+            img_ids that match the target_img_id
+    """
+
+    # binary search to find annotation
+    l_ptr = 0
+    r_ptr = len(annotations)
+
+    target_img_id = int(target_img_id)
+
+    idx = -1
+    while l_ptr <= r_ptr:
+        mid = int(r_ptr - l_ptr) // 2 + l_ptr
+        current_img_id = annotations[mid]['image_id']
+        if current_img_id == target_img_id:
+            idx = mid
+            break
+        elif current_img_id > target_img_id:
+            r_ptr = mid - 1
+        else:
+            l_ptr = mid + 1
+
+    if idx == -1:
+        return None
+
+    # look to the left and to the right to get all of the annotations with
+    # the same image id
+    matching_annotations = []
+    ptr = idx
+    while(ptr >= 0
+        and annotations[ptr]['image_id'] == target_img_id):
+        matching_annotations.append(annotations[ptr])
+        ptr -= 1
+    ptr = idx+1
+    while(ptr < len(annotations)
+        and annotations[ptr]['image_id'] == target_img_id):
+        matching_annotations.append(annotations[ptr])
+        ptr += 1
+
+    return matching_annotations
+
 def get_rand_sample_from_coco_json(original_json_file,
                                      new_json_file,
                                      sample_size,
@@ -811,59 +862,7 @@ def get_rand_sample_from_coco_json(original_json_file,
 
     Returns:
 
-    """
-
-    def get_annotations_by_img_id(annotations,
-                                  target_img_id):
-        """ Gets a list of annotations that correspond to a specific img_id.
-        
-        Args:
-            annotations (list(dict)): a list of annotation dicts from a coco
-                format dataset
-            img_id (int or str): image id to match annotations to
-            
-        Returns:
-            matching_annotations (list(dict)): a list of annotations with
-                img_ids that match the target_img_id
-        """
-
-        # binary search to find annotation
-        l_ptr = 0
-        r_ptr = len(annotations)
-
-        target_img_id = int(target_img_id)
-
-        idx = -1
-        while l_ptr <= r_ptr:
-            mid = int(r_ptr - l_ptr) // 2 + l_ptr
-            current_img_id = annotations[mid]['image_id']
-            if current_img_id == target_img_id:
-                idx = mid
-                break
-            elif current_img_id > target_img_id:
-                r_ptr = mid - 1
-            else:
-                l_ptr = mid + 1
-
-        if idx == -1:
-            return None
-
-        # look to the left and to the right to get all of the annotations with
-        # the same image id
-        matching_annotations = []
-        ptr = idx
-        while(ptr >= 0
-            and annotations[ptr]['image_id'] == target_img_id):
-            matching_annotations.append(annotations[ptr])
-            ptr -= 1
-        ptr = idx+1
-        while(ptr < len(annotations)
-            and annotations[ptr]['image_id'] == target_img_id):
-            matching_annotations.append(annotations[ptr])
-            ptr += 1
-
-        return matching_annotations
-            
+    """     
 
     with open(original_json_file, 'r') as file:
         data =json.load(file)
