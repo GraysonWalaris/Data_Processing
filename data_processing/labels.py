@@ -794,7 +794,8 @@ def get_img_paths_coco_format(exclude_synthetic=True):
     return img_paths
 
 def get_annotations_by_img_id(annotations,
-                                  target_img_id):
+                              target_img_id,
+                              anns_sorted=True):
     """ Gets a list of annotations that correspond to a specific img_id.
     
     Args:
@@ -807,11 +808,15 @@ def get_annotations_by_img_id(annotations,
             img_ids that match the target_img_id
     """
 
+    # sort annotations
+    if not anns_sorted:
+        annotations = sorted(annotations, key = lambda x: x['image_id'])
+
     # binary search to find annotation
     l_ptr = 0
-    r_ptr = len(annotations)
+    r_ptr = len(annotations)-1
 
-    target_img_id = int(target_img_id)
+    # target_img_id = int(target_img_id)
 
     idx = -1
     while l_ptr <= r_ptr:
@@ -983,3 +988,67 @@ def get_category_info_coco_format(json_file,
             class_labels_by_name[COCO_CLASSES_DICT_NUM2NAME[class_label]] = num_object_present
 
     return class_labels_by_name
+
+#---------------------------------YOLO FORMAT---------------------------------*
+
+def convert_labels_coco2yolo(coco_json_file: str,
+                             yolo_label_folder: str):
+    
+    # load the coco information
+    with open(coco_json_file, 'r') as file:
+        coco_data = json.load(file)
+
+    images = coco_data['images']
+    annotations = coco_data['annotations']
+
+    # sort the images and the annotations by img_id
+    images = sorted(images, key = lambda x: x['id'])
+    annotations = sorted(annotations, key = lambda x: x['image_id'])
+
+    # take a pass through the annotations, and save all annotations for each
+    # image in their own file in yolo format (https://towardsdatascience.com/image-data-labelling-and-annotation-everything-you-need-to-know-86ede6c684b1#:~:text=YOLO%3A%20In%20YOLO%20labeling%20format,object%20coordinates%2C%20height%20and%20width.)
+    img_idx = 0
+    img_id = images[0]['id']
+    label_file_name = os.path.join(yolo_label_folder,
+                                   ('*').join(images[0]['file_name'].split('/')).replace('png', 'txt'))
+    labels = []
+    idx = 0
+    for idx in tqdm(range(len(annotations))):
+        ann = annotations[idx]
+
+        # get image id of the annotation
+        new_img_id = ann['image_id']
+        # print(f'ann img id: {new_img_id}')
+        # print(f"img_dict id: {images[img_idx]['id']}")
+        if new_img_id != img_id:
+            # save the labels list to the old label_file_name
+            with open(label_file_name, 'w') as file:
+                for label in labels:
+                    file.write(label+'\n')
+                labels = []
+
+            # get a new label_file_name
+            img_idx += 1
+            img_dict = images[img_idx]
+
+            # sometimes there are images with no annotations, skip over them
+            while img_dict['id'] != new_img_id:
+                img_idx += 1
+                img_dict = images[img_idx]
+
+            img_id = img_dict['id']
+            img_path = img_dict['file_name']
+
+            label_file_name = os.path.join(yolo_label_folder,
+                                           ('*').join(img_path.split('/')).replace('png', 'txt'))
+
+        # get the label in the yolo label format string
+        cat_id = str(ann['category_id'])
+
+        # get bbox in yolo format (x, y, w, h)
+        bbox_string = (' ').join([str(int(i)) for i in ann['bbox']])
+
+        yolo_label = cat_id + ' ' + bbox_string
+
+        # add the yolo label to the labels list
+        labels.append(yolo_label)

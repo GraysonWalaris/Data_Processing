@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import json
 import glob
+import random
 
 from data_processing.labels import COCO_CLASSES_DICT_NUM2NAME, COCO_CLASSES_DICT_NAME2NUM, WALARIS_CLASS_LABELS_NUM2NAME, get_random_label
 
@@ -17,7 +18,7 @@ def show_bboxes(boxes, ax, bbox_format: str, labels=None):
     Args:
         boxes (list): list of bounding boxes
         ax (plt.ax object): axis object from matplotlib.pyplot
-        bbox_format (str): specify the format for the bboxes
+        bbox_format (str): specify the format for the bboxes (xyxy | xywh)
         labels (list): a list of labels in string format
         
     Returns:
@@ -41,10 +42,10 @@ def show_bboxes(boxes, ax, bbox_format: str, labels=None):
     if labels is not None:
         for idx in range(len(boxes)):
             show_bbox(boxes[idx], ax, 
-                          bbox_format='xywh', label=labels[idx])
+                          bbox_format, label=labels[idx])
     else:
         for idx in range(len(boxes)):
-            show_bbox(boxes[idx], ax, bbox_format='xywh')
+            show_bbox(boxes[idx], ax, bbox_format)
     
 def show_masks(masks, ax, random_color=True):
     """Displays an image with bounding boxes and labels drawn.
@@ -402,7 +403,7 @@ def visualize_coco_ground_truth_dataset(json_file,
 
         # binary search to find annotation
         l_ptr = 0
-        r_ptr = len(annotations)
+        r_ptr = len(annotations)-1
 
         idx = -1
         while l_ptr <= r_ptr:
@@ -505,6 +506,106 @@ def visualize_coco_results(results_json_file,
 
         # visualize the image
         visualize_coco_labelled_img(full_path, curr_img_annotations, label_convention)
+
+def visualize_yolo_labelled_img(img_path,
+                                annotations,
+                                label_convention):
+    """Show the bounding boxes of a labelled coco image. Assumes the
+    annotations are in coco format (meaning bboxes are xywh).
+    
+    Args:
+        img_path (str): path to the labelled image
+        annotations (list): list of annotations corresponding to
+            the labelled img in the yolo format (class_id x y w h)
+        label_convention (str): what label conventions are the annotations
+            using? (walaris or coco supported)
+         
+    Returns
+
+    """
+
+    # ensure the img_path is only the img file extension
+    img_path = img_path.split('/')[-3:]
+
+    base_path = os.environ.get('WALARIS_MAIN_DATA_PATH')
+
+    full_img_path = os.path.join(base_path,
+                                 'Images',
+                                 img_path[0],
+                                 img_path[1],
+                                 img_path[2])
+    
+    # make sure the image can be found on the machine
+    assert os.path.exists(full_img_path), "Error: Image not found on machine."
+
+    # read img
+    img = cv2.imread(full_img_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # get the bboxes and class labels
+    bboxes = []
+    class_labels = []
+    for annotation in annotations:
+        bboxes.append(annotation[1:])
+        if label_convention == 'coco':
+            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation[0]])
+        elif label_convention == 'walaris':
+            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[annotation[0]])
+
+    fig, ax = plt.subplots()
+    ax.imshow(img)
+
+    # plot bboxes on image
+    show_bboxes(bboxes, ax, bbox_format='xywh', labels=class_labels)
+    plt.show()
+
+    return
+
+def visualize_yolo_ground_truth_dataset(yolo_labels_folder: str,
+                                        label_convention):
+    """Randomly visualize images and labels from a dataset in the format of the
+    ground truth yolo dataset. This can be used to test and visualize sampled
+    datasets.
+
+    Args:
+        yolo_labels_folder (str): path to the folder containing the label .txt
+            files
+        label_convention (str): what label conventions are the annotations
+            using? (walaris or coco supported)
+
+    Returns:
+    
+    """
+
+    # get a list of all of the labels for each image
+    label_file_paths = glob.glob(yolo_labels_folder+'/*')
+
+    # get a random label from the label file path
+    while 1:
+        label_file_path = random.choice(label_file_paths)
+
+        # get the image file path from the label name
+        label_file_name = label_file_path.split('/')[-1]
+        img_relative_path = ('/').join(label_file_name.replace('txt', 'png').split('*'))    
+        img_full_path = os.path.join(BASE_IMAGE_PATH,
+                                     img_relative_path)
+        
+        # get a list of annotations from the label file
+        with open(label_file_path, 'r') as file:
+            labels = []
+            for line in file:
+                line = line.strip()
+                label = [int(x) for x in line.split(" ")]
+                labels.append(label)
+        
+        
+        
+        # display the image
+        visualize_yolo_labelled_img(img_full_path,
+                                    labels,
+                                    label_convention=label_convention)
+        
+
 
 
 
