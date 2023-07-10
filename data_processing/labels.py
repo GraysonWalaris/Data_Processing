@@ -70,6 +70,7 @@ def get_file_name2relative_path_json_file():
 
 # create the file_name2relative_path dictionary if it does not exist
 if not os.path.isfile(YOLO_FILE_NAME2RELATIVE_PATH):
+    print(f"No name2relative_path file found. Creating one and placing it in {os.environ.get('YOLO_ADMIN_PATH')}")
     get_file_name2relative_path_json_file()
 
 # the COCO paper uses the below classes. the coco dataset uses an expanded version
@@ -1119,7 +1120,7 @@ def convert_labels_coco2yolo(coco_json_file: str,
                                    img_path.split('/')[-1].replace('png', 'txt'))
 
         # get the label in the yolo label format string
-        cat_id = str(ann['category_id'])
+        cat_id = str(ann['category_id']-1)
 
         # normalize bbox per the yolo format requirements
         bbox = ann['bbox']
@@ -1332,7 +1333,7 @@ def yolo_clean():
     location, record the image relative path to keep track of lost images
 
     """
-    print('Restoring original dataset..')
+    print('Restoring Walaris format dataset..')
     lost_images = []
     for new_path in new_paths:
         new_path = new_path.replace('\n', '')

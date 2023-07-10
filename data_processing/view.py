@@ -537,9 +537,9 @@ def visualize_yolo_labelled_img(img_path,
     for annotation in annotations:
         bboxes.append(annotation[1:])
         if label_convention == 'coco':
-            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[int(annotation[0])])
+            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[int(annotation[0])+1])
         elif label_convention == 'walaris':
-            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[int(annotation[0])])
+            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[int(annotation[0])+1])
 
     fig, ax = plt.subplots()
     ax.imshow(img)
