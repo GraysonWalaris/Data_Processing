@@ -21,7 +21,7 @@ pip install -e .
 Install PyTorch in your conda environment:
 
 ~~~bash
-conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+conda install pytorch torchvision torchaudio pytorch-cuda=<your_installed_CUDA_version_here> -c pytorch -c nvidia
 ~~~
 
 ## Environment Variables
@@ -46,6 +46,8 @@ For creating YOLO datasets from COCO json files, you will need to add one enviro
 ~~~bash
 export YOLO_ADMIN_PATH='/home/$USER/yolo_admin_files'
 ~~~
+
+**WARNING**: You can specify the YOLO_ADMIN_PATH anywhere you like, but it is recommended to make sure that it is specified to a path that is very unlikely to be deleted. If this path is deleted when you have an active yolo dataset, you will lose the ability to restore your Walaris main dataset and will have to re-sync your dataset (download all lost images).
 
 Now you should be set up!
 
