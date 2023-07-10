@@ -523,23 +523,12 @@ def visualize_yolo_labelled_img(img_path,
     Returns
 
     """
-
-    # ensure the img_path is only the img file extension
-    img_path = img_path.split('/')[-3:]
-
-    base_path = os.environ.get('WALARIS_MAIN_DATA_PATH')
-
-    full_img_path = os.path.join(base_path,
-                                 'Images',
-                                 img_path[0],
-                                 img_path[1],
-                                 img_path[2])
     
     # make sure the image can be found on the machine
-    assert os.path.exists(full_img_path), "Error: Image not found on machine."
+    assert os.path.exists(img_path), "Error: Image not found on machine."
 
     # read img
-    img = cv2.imread(full_img_path)
+    img = cv2.imread(img_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # get the bboxes and class labels
@@ -548,12 +537,20 @@ def visualize_yolo_labelled_img(img_path,
     for annotation in annotations:
         bboxes.append(annotation[1:])
         if label_convention == 'coco':
-            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation[0]])
+            class_labels.append(COCO_CLASSES_DICT_NUM2NAME[int(annotation[0])])
         elif label_convention == 'walaris':
-            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[annotation[0]])
+            class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[int(annotation[0])])
 
     fig, ax = plt.subplots()
     ax.imshow(img)
+
+    # the yolo bboxes come in a normalized format. unnormalize them before
+    # rendering the bboxes
+    height, width, _ = img.shape
+
+    for bbox in bboxes:
+        bbox[0], bbox[2] = int(bbox[0]*width), int(bbox[2]*width)
+        bbox[1], bbox[3] = int(bbox[1]*height), int(bbox[3]*height)
 
     # plot bboxes on image
     show_bboxes(bboxes, ax, bbox_format='xywh', labels=class_labels)
@@ -586,22 +583,22 @@ def visualize_yolo_ground_truth_dataset(yolo_labels_folder: str,
 
         # get the image file path from the label name
         label_file_name = label_file_path.split('/')[-1]
-        img_relative_path = ('/').join(label_file_name.replace('txt', 'png').split('*'))    
-        img_full_path = os.path.join(BASE_IMAGE_PATH,
-                                     img_relative_path)
+        img_file_name = label_file_name.replace('txt', 'png')
+        img_file_path = label_file_path.split('/')
+        img_file_path[-2] = 'images'
+        img_file_path[-1] = img_file_name
+        img_file_path = ('/').join(img_file_path)
         
         # get a list of annotations from the label file
         with open(label_file_path, 'r') as file:
             labels = []
             for line in file:
                 line = line.strip()
-                label = [int(x) for x in line.split(" ")]
+                label = [float(x) for x in line.split(" ")]
                 labels.append(label)
         
-        
-        
         # display the image
-        visualize_yolo_labelled_img(img_full_path,
+        visualize_yolo_labelled_img(img_file_path,
                                     labels,
                                     label_convention=label_convention)
         
@@ -819,4 +816,5 @@ def visualize_yolo_ground_truth_dataset(yolo_labels_folder: str,
 #     return adjusted
 
 if __name__=='__main__':
-    visualize_img_using_walaris_label()
+    # visualize_img_using_walaris_label()
+    pass
