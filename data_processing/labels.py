@@ -911,10 +911,10 @@ def get_annotations_by_img_id(annotations,
     return matching_annotations
 
 def get_rand_sample_from_coco_json(original_json_file,
-                                     new_json_file,
-                                     sample_size,
-                                     seed=None,
-                                     include_unlabelled_images=False):
+                                   new_json_file,
+                                   sample_size,
+                                   seed=None,
+                                   include_unlabelled_images=False):
     """ Randomly sample a coco format dataset from a coco format dataset.
 
     Args:
@@ -925,6 +925,9 @@ def get_rand_sample_from_coco_json(original_json_file,
         include_unlabelled_images (bool): If False, check to make sure that
             sampled images have annotations in them before adding them to the
             sample.
+        classes_to_include (Set[str]): pass a set of strings to include in the
+            sampled dataset. Only the labels from these classes will be
+            included in the new dataset.
 
     Returns:
 
@@ -1006,6 +1009,111 @@ def get_rand_sample_from_coco_json(original_json_file,
 
     return
 
+def remove_labels_by_class_coco(coco_json_file,
+                                new_json_file,
+                                label_convention='walaris',
+                                classes_to_include=None,
+                                classes_to_remove=None,
+                                include_images_w_no_labels=False):
+    """Users can specify which classes to keep or which classes to remove from
+    a coco dataset.
+    
+    Args:
+        coco_json_file (str): path to json file you wish to modify
+        new_json_file (str): path to new json file to save to
+        coco_label_convention (str): specify what label convention the original
+            coco json dataset is using
+        classes_to_include (Set{str}): set of class labels that you want to
+            keep
+        classes_to_remove (Set{str}): set of class labels that you want to
+            remove
+
+    Returns:
+
+    """
+
+    supported_label_conventions = {'walaris', 'coco', 'coco_paper'}
+
+    assert not (classes_to_include == None and classes_to_remove == None), "Error: You must specify which classes to"\
+        " keep or which classes to remove."
+
+    assert not (classes_to_include and classes_to_remove), "Error: You cannot specify both classes to keep and classes"\
+        " to remove."
+    
+    if classes_to_include:
+        for class_label in classes_to_include:
+            assert isinstance(class_label, str), 'Error: The contents of classes_to_include must be a string of a name'\
+                ' in the specified label convention.'
+    if classes_to_remove:
+        for class_label in classes_to_remove:
+            assert isinstance(class_label, str), 'Error: The contents of classes_to_remove must be a string of a name'\
+                ' in the specified label convention.'
+    
+    assert label_convention in supported_label_conventions, 'Error: Label convention not supported.'
+    
+    if label_convention == 'walaris':
+        num2name_dict = WALARIS_CLASS_LABELS_NUM2NAME
+    elif label_convention == 'coco':
+        num2name_dict = COCO_CLASSES_DICT_NUM2NAME
+    elif label_convention == 'coco_paper':
+        num2name_dict = COCO_CLASSES_DICT_NUM2NAME_PAPER_VERSION    
+
+    with open(coco_json_file, 'r') as file:
+        data = json.load(file)
+
+    annotations = data['annotations']
+
+    # if the user passes a classes to include set, loop through the annotations
+    # and remove any classes that are not in the specified set
+    l_ptr = r_ptr = 0
+    while r_ptr < len(annotations):
+        annotation = annotations[r_ptr]
+        if classes_to_include:
+            class_name = num2name_dict[annotation['category_id']]
+            if class_name in classes_to_include:
+                annotations[l_ptr], annotations[r_ptr] = annotations[r_ptr], annotations[l_ptr]
+                l_ptr += 1
+            r_ptr += 1
+        else:
+            if class_name not in classes_to_remove:
+                annotations[l_ptr], annotations[r_ptr] = annotations[r_ptr], annotations[l_ptr]
+                l_ptr += 1
+            r_ptr += 1
+
+    annotations = annotations[:l_ptr]
+
+    if include_images_w_no_labels:
+        data['annotations'] = annotations
+
+        with open(new_json_file, 'w') as file:
+            json.dump(data, file)
+
+        return
+    
+    # remove all images that have no annotations
+    images = data['images']
+    annotations = sorted(annotations, key = lambda x: x['image_id'])
+
+    # remove images without annotations (there are no detections on some images)
+    l_ptr = r_ptr = 0
+    while r_ptr < len(images):
+        target_img_id = images[r_ptr]['id']
+        matching_annotations = get_annotations_by_img_id(annotations,
+                                                            target_img_id)
+        if matching_annotations is not None:
+            images[l_ptr], images[r_ptr] = images[r_ptr], images[l_ptr]
+            l_ptr += 1
+        
+        r_ptr += 1
+    
+    images = images[:l_ptr]
+
+    data['images'] = images
+    data['annotations'] = annotations
+    
+    with open(new_json_file, 'w') as file:
+        json.dump(data, file)
+
 def get_category_info_coco_format(json_file,
                                   label_convention,
                                   isPrint=False):
@@ -1039,6 +1147,8 @@ def get_category_info_coco_format(json_file,
                 print(f'{class_label}: {WALARIS_CLASS_LABELS_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
             elif label_convention == 'coco':
                 print(f'{class_label}: {COCO_CLASSES_DICT_NUM2NAME[class_label]} - {class_labels_present[class_label]}')
+            else:
+                print(f'{class_label}: {label_convention[class_label]} - {class_labels_present[class_label]}')
 
     class_labels_by_name = {}
     for class_label in class_labels_present:
@@ -1047,6 +1157,8 @@ def get_category_info_coco_format(json_file,
                 class_labels_by_name[WALARIS_CLASS_LABELS_NUM2NAME[class_label]] = num_object_present
         elif label_convention == 'coco':
             class_labels_by_name[COCO_CLASSES_DICT_NUM2NAME[class_label]] = num_object_present
+        else:
+            class_labels_by_name[label_convention[class_label]] = num_object_present
 
     return class_labels_by_name
 
@@ -1126,6 +1238,13 @@ def convert_labels_coco2yolo(coco_json_file: str,
         bbox = ann['bbox']
         width = images[img_idx]['width']
         height = images[img_idx]['height']
+
+        # yolo is in the format xywh where x and y are the bbox center. coco is
+        # in the xywh format where x and y are the right corner. here we convert
+        # the coco xy to yolo xy and then normatlize the bbox
+
+        bbox[0] = bbox[0] + bbox[2] / 2
+        bbox[1] = bbox[1] + bbox[3] / 2
 
         bbox[0], bbox[2] = bbox[0] / width, bbox[2] / width
         bbox[1], bbox[3] = bbox[1] / height, bbox[3] / height

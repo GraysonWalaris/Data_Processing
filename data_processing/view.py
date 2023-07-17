@@ -31,13 +31,23 @@ def show_bboxes(boxes, ax, bbox_format: str, labels=None):
             w, h = box[2] - box[0], box[3] - box[1]
             ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
                                         facecolor=(0,0,0,0), lw=2))
-        elif bbox_format == 'xywh':
+        elif bbox_format == 'xywh_min' or bbox_format == 'xywh_coco':
             x0, y0 = box[0], box[1]
             w, h = box[2], box[3]
             ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', 
                                         facecolor=(0,0,0,0), lw=1))
+        elif bbox_format == 'xywh_center' or bbox_format == 'xywh_yolo':
+            x0, y0 = box[0], box[1]
+            w, h = box[2], box[3]
+            ax.add_patch(plt.Rectangle((x0-w/2, y0-h/2), w, h, edgecolor='green', 
+                                        facecolor=(0,0,0,0), lw=1))
         if label is not None:
-            ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
+            if bbox_format == 'xyxy':
+                ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
+            elif bbox_format == 'xywh_min' or bbox_format == 'xywh_coco':
+                ax.text(int(x0), int(y0)-10, label, color='red', fontsize=10)
+            elif bbox_format == 'xywh_center' or bbox_format == 'xywh_yolo':
+                ax.text(int(x0)-w/2, int(y0)-h/2-10, label, color='red', fontsize=10)
 
     if labels is not None:
         for idx in range(len(boxes)):
@@ -333,7 +343,12 @@ def visualize_coco_labelled_img(img_path,
                                  img_path[1],
                                  img_path[2])
     
-    # make sure the image can be found on the machine
+    # TODO: Add more general visualization capability
+    # make sure the image can be found on the machine. check any active yolo
+    # dataset directories if it cannot be found in the default location
+    if not os.path.exists(full_img_path):
+        pass
+
     assert os.path.exists(full_img_path), "Error: Image not found on machine."
 
     # read img
@@ -349,12 +364,14 @@ def visualize_coco_labelled_img(img_path,
             class_labels.append(COCO_CLASSES_DICT_NUM2NAME[annotation['category_id']])
         elif label_convention == 'walaris':
             class_labels.append(WALARIS_CLASS_LABELS_NUM2NAME[annotation['category_id']])
+        else:
+            class_labels.append(label_convention[annotation['category_id']])
 
     fig, ax = plt.subplots()
     ax.imshow(img)
 
     # plot bboxes on image
-    show_bboxes(bboxes, ax, bbox_format='xywh', labels=class_labels)
+    show_bboxes(bboxes, ax, bbox_format='xywh_coco', labels=class_labels)
     plt.show()
 
     return
@@ -373,6 +390,14 @@ def visualize_coco_ground_truth_dataset(json_file,
     Returns:
     
     """
+    supported_label_conventions = set({
+        'walaris',
+        'coco'
+    })
+
+    assert (type(label_convention) is dict), "Error: Label "\
+        "convention must be a supported type or a custom dictionary."
+
     with open(json_file, 'r') as file:
         data = json.load(file)
 
@@ -525,6 +550,10 @@ def visualize_yolo_labelled_img(img_path,
     """
     
     # make sure the image can be found on the machine
+    # check for .jpg version of image too
+    if not os.path.exists(img_path):
+        img_path = img_path.replace('png', 'jpg')
+
     assert os.path.exists(img_path), "Error: Image not found on machine."
 
     # read img
@@ -553,7 +582,7 @@ def visualize_yolo_labelled_img(img_path,
         bbox[1], bbox[3] = int(bbox[1]*height), int(bbox[3]*height)
 
     # plot bboxes on image
-    show_bboxes(bboxes, ax, bbox_format='xywh', labels=class_labels)
+    show_bboxes(bboxes, ax, bbox_format='xywh_yolo', labels=class_labels)
     plt.show()
 
     return
