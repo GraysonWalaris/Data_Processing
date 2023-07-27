@@ -395,8 +395,8 @@ def visualize_coco_ground_truth_dataset(json_file,
         'coco'
     })
 
-    assert (type(label_convention) is dict), "Error: Label "\
-        "convention must be a supported type or a custom dictionary."
+    # assert (type(label_convention) is dict), "Error: Label "\
+    #     "convention must be a supported type or a custom dictionary."
 
     with open(json_file, 'r') as file:
         data = json.load(file)

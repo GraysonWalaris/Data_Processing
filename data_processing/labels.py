@@ -1162,6 +1162,83 @@ def get_category_info_coco_format(json_file,
 
     return class_labels_by_name
 
+def get_bbox_info_from_coco_annotations(annotations,
+                                        label_convention,
+                                        class_name_to_show,
+                                        bin_count = 1000):
+    """Plot the size of the bbox information for each class using a histogram.
+    
+    Args:
+        json_file (str): file path to the json folder to read from
+        label_convention (str): specify which label convention the data is
+            using
+
+    Returns:
+
+    """
+    supported_label_conventions = {
+        'walaris': WALARIS_CLASS_LABELS_NUM2NAME,
+        'coco': COCO_CLASSES_DICT_NUM2NAME
+    }
+
+    assert (isinstance(label_convention, dict) or label_convention in supported_label_conventions), ("Error: "\
+        "unsupported label convention.")
+    
+    label_convention = supported_label_conventions[label_convention]
+
+    # loop through each annotation, add the area of the bbox to the list that
+    # corresponds to the class name in bbox_info
+    bbox_areas = []
+
+    # keep track of the max bbox area
+    for annotation in annotations:
+        cat_id = annotation['category_id']
+        cat_name = label_convention[cat_id]
+        if cat_name != class_name_to_show:
+            continue
+        bbox = annotation['bbox']
+        area = bbox[2] * bbox[3]
+        bbox_areas.append(area)
+
+    bbox_areas.sort()
+
+    # plot a histogram of the bboxes with the outliers removed
+    # split into 30 bins
+    # bin_size = bbox_areas[-1] // num_hist_bins
+    bins = np.linspace(0, max(bbox_areas), bin_count)
+    plt.subplot(121)
+    plt.gca().set_title(f'Complete Data Distribution ({len(bbox_areas)} data points)')
+    plt.xlabel('Bounding Box Area')
+    plt.ylabel('Frequency of Images in Dataset')
+    plt.hist(bbox_areas, bins=bins)
+
+    # remove outliers
+    q3, q1 = np.percentile(np.array(bbox_areas), [75, 25])
+    iqr = q3 - q1
+    max_threshold = q3 + 1.5 * iqr
+    min_threshold = q1 - 1.5 * iqr
+
+    # remove outliers
+    idx = 0
+    while bbox_areas[idx] < min_threshold:
+        idx += 1
+    
+    bbox_areas = bbox_areas[idx:]
+
+    idx = 0
+    while bbox_areas[idx] < max_threshold:
+        idx += 1
+    
+    outliers_removed = len(bbox_areas) - idx
+    bbox_areas = bbox_areas[:idx]
+
+    bins = np.linspace(0, max(bbox_areas), bin_count)
+    plt.subplot(122)
+    plt.xlim(0, 25000)
+    plt.gca().set_title(f'Outliers Removed ({len(bbox_areas)} datapoints)')
+    plt.hist(bbox_areas, bins=bins)
+    plt.show()
+
 #---------------------------------YOLO FORMAT---------------------------------*
 
 def convert_labels_coco2yolo(coco_json_file: str,
@@ -1197,8 +1274,14 @@ def convert_labels_coco2yolo(coco_json_file: str,
     img_idx = 0
     img_id = images[0]['id']
     img_path = images[0]['file_name']
-    label_file_name = os.path.join(yolo_label_folder,
-                                   images[0]['file_name'].split('/')[-1].replace('png', 'txt'))
+    if '.png' in img_path:
+        label_file_name = os.path.join(yolo_label_folder,
+                                    images[0]['file_name'].split('/')[-1].replace('png', 'txt'))
+    elif '.jpg' in img_path:
+        label_file_name = os.path.join(yolo_label_folder,
+                                    images[0]['file_name'].split('/')[-1].replace('jpg', 'txt'))
+    else:
+        raise Exception("Error: invalid image format in dataset (.jpg and .png accepted)..")
     labels = []
     idx = 0
     print('Creating yolo labels in Labels folder..')
@@ -1228,8 +1311,12 @@ def convert_labels_coco2yolo(coco_json_file: str,
             img_id = img_dict['id']
             img_path = img_dict['file_name']
 
-            label_file_name = os.path.join(yolo_label_folder,
-                                   img_path.split('/')[-1].replace('png', 'txt'))
+            if '.png' in img_path:
+                label_file_name = os.path.join(yolo_label_folder,
+                                            images[0]['file_name'].split('/')[-1].replace('png', 'txt'))
+            elif '.jpg' in img_path:
+                label_file_name = os.path.join(yolo_label_folder,
+                                            images[0]['file_name'].split('/')[-1].replace('jpg', 'txt'))
 
         # get the label in the yolo label format string
         cat_id = str(ann['category_id']-1)
@@ -1341,7 +1428,7 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
     dataset into a yolo formatted dataset. The images will need to be moved
     from their standard location in the Tarsier_Main_Dataset to a new folder
     in the yolo_dataset_base_path. These images can be moved back with the
-    restore_walaris_dataset_from_yolo function.
+    yolo_clean function.
     
     Args:
         coco_train_json_file (str): path to the train json file in the coco 
@@ -1410,7 +1497,92 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
 
     # if there is any error in creating the dataset, attempt to restore the 
     # original dataset and check for lost files   
-    except:
+    except Exception as inst:
+        print('There was an error creating the dataset...')
+        print(inst)
+        yolo_clean()
+
+def get_coco_dataset_from_coco_json_file(coco_train_json_file: str,
+                                         coco_val_json_file: str,
+                                         dataset_folder_base_path: str,
+                                         dataset_name: str = None,
+                                         class_names = 'walaris_18'):
+    """Transform a coco dataset the references images from the walaris main
+    dataset into a yolo formatted dataset. The images will need to be moved
+    from their standard location in the Tarsier_Main_Dataset to a new folder
+    in the yolo_dataset_base_path. These images can be moved back with the
+    yolo_clean function.
+    
+    Args:
+        coco_train_json_file (str): path to the train json file in the coco 
+            format
+        coco_val_json_file (str): path to the val json file in the coco format
+        yolo_image_folder (str): path to the base yolo dataset folder
+        dataset_name (str): name of the dataset (for naming the .yaml file)
+        class_names (str or list): specify the name of a predefined class names
+            format (only walaris currently supported) or provide a custom list
+            of the class names. the order of the class names must correspond 
+            with the number of that class names category id. 
+        
+    Returns: 
+    
+    """
+
+    # restore the original dataset before creating the new yolo dataset
+    yolo_clean()
+    
+    try:
+        # make sure the class names input is valid
+        if not isinstance(class_names, list):
+            if class_names == 'walaris_18' or class_names == 'walaris':
+                class_names = [x for x in WALARIS_CLASS_LABELS_NAME2NUM]
+                class_names = class_names[:18]
+            elif class_names == 'walaris_22':
+                class_names = [x for x in WALARIS_CLASS_LABELS_NAME2NUM]
+            else:
+                AssertionError("Class names string not recognized. See documentation for supported strings")
+
+        # create the new yolo base directory if it does not exists
+        if not os.path.exists(dataset_folder_base_path):
+            os.makedirs(dataset_folder_base_path)
+
+        # save the training images and labels to their new locations
+        train_folder_path = os.path.join(dataset_folder_base_path, 'train')
+        train_images_folder_path = os.path.join(train_folder_path, 'images')
+        train_labels_folder_path = os.path.join(train_folder_path, 'labels')
+
+        convert_labels_coco2yolo(coco_train_json_file, train_labels_folder_path)
+        move_coco_imgs_to_yolo_folder(coco_train_json_file, train_images_folder_path)
+
+        # save the validataion images and labels to their new locations
+        val_folder_path = os.path.join(dataset_folder_base_path, 'valid')
+        val_images_folder_path = os.path.join(val_folder_path, 'images')
+        val_labels_folder_path = os.path.join(val_folder_path, 'labels')
+
+        convert_labels_coco2yolo(coco_val_json_file, val_labels_folder_path)
+        move_coco_imgs_to_yolo_folder(coco_val_json_file, val_images_folder_path)
+
+        # create the .yaml file. if no name is provided, name it the same as the
+        # training coco json file
+        if dataset_name is None:
+            dataset_name = coco_train_json_file.split('/')[-1].replace('json', '')
+
+        # create yaml data and save to file
+        yaml_data = {}
+        yaml_data['train'] = 'train/images'
+        yaml_data['val'] = 'valid/images'
+        yaml_data['nc'] = len(class_names)
+        yaml_data['names'] = class_names
+        yaml_file_path = os.path.join(dataset_folder_base_path,
+                                    dataset_name+'.yaml')
+        with open(yaml_file_path, 'w') as file:
+            yaml.dump(yaml_data, file)
+
+    # if there is any error in creating the dataset, attempt to restore the 
+    # original dataset and check for lost files   
+    except Exception as inst:
+        print('There was an error creating the dataset...')
+        print(inst)
         yolo_clean()
 
 def yolo_clean():
