@@ -1166,7 +1166,8 @@ def get_bbox_info_from_coco_annotations(annotations,
                                         label_convention,
                                         class_name_to_show,
                                         bin_count = 1000):
-    """Plot the size of the bbox information for each class using a histogram.
+    """Plot information regarding the distribution of bbox sizes for a class
+    using a frequency plot histogram.
     
     Args:
         json_file (str): file path to the json folder to read from

@@ -12,7 +12,7 @@ BASE_DATASET_PATH = os.environ.get('WALARIS_MAIN_DATA_PATH')
 BASE_IMAGE_PATH = os.path.join(BASE_DATASET_PATH, 'Images')
 BASE_LABELS_PATH = os.path.join(BASE_DATASET_PATH, 'Labels_NEW')
 
-def show_bboxes(boxes, ax, bbox_format: str, labels=None):
+def show_bboxes(boxes: list, ax, bbox_format: str, labels: list=None):
     """Displays an image with bounding boxes and labels drawn.
     
     Args:
@@ -57,8 +57,8 @@ def show_bboxes(boxes, ax, bbox_format: str, labels=None):
         for idx in range(len(boxes)):
             show_bbox(boxes[idx], ax, bbox_format)
     
-def show_masks(masks, ax, random_color=True):
-    """Displays an image with bounding boxes and labels drawn.
+def show_masks(masks: list, ax, random_color: bool=True):
+    """Displays an image with masks shown.
     
     Args:
         masks (list): list of masks in np binary format (1 channel)
@@ -378,9 +378,8 @@ def visualize_coco_labelled_img(img_path,
 
 def visualize_coco_ground_truth_dataset(json_file,
                                         label_convention):
-    """Randomly visualize images and labels from a dataset in the format of the
-    ground truth coco dataset. This can be used to test and visualize sampled
-    datasets.
+    """Randomly visualize images and labels from a dataset in the format of a 
+    coco json file. This can be used to test and visualize sampled datasets.
 
     Args:
         json_file (str): path to ground truth dataset .json file

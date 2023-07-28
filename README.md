@@ -41,7 +41,7 @@ On Linux, add this to your .bashrc:
 export WALARIS_MAIN_DATA_PATH='/home/grayson/Documents/Tarsier_Main_Dataset/'
 ~~~
 
-For creating YOLO datasets from COCO json files, you will need to add one environment variable to your ~/.bashrc:
+For creating YOLO datasets or COCO dataset directory structures (moving all training images into one folder) from COCO json files, you will need to add one environment variable to your ~/.bashrc:
 
 ~~~bash
 export WALARIS_RESTORE_PATH='/home/$USER/walaris_dataset_restore_files'
@@ -118,12 +118,137 @@ view.visualize_yolo_ground_truth_dataset('/path/to/yolo/labels/folder',
                                          label_convention='walaris')
 ~~~
 
-# Classes Documentation
+# Useful Methods
 
-## blend
+Use the following methods by importing the views and labels modules
 
-`from data_processing import blend`
+~~~python
+from data_processing import views, labels
+~~~
 
-### OOI_Blender
+You can find detailed doc string specifying how to use the functions, paramater information, and more by looking at the source code for each function.
 
-Use this class to generate novel images by taking objects of interest from the Tarsier_Main_Dataset and blending them into background images of your choice.
+## views module
+
+~~~python
+views.visualize_coco_ground_truth_dataset(json_file, label_convention)
+~~~
+
+Randomly visualize images and labels from a dataset in the format of a coco json file. This can be used to test and visualize sampled
+datasets.
+
+~~~python
+views.visualize_yolo_ground_truth_dataset(yolo_labels_folder, label_convention)
+~~~
+
+Randomly visualize images and labels from a dataset in the format of an ultralytics yolo dataset. This can be used to test and visualize sampled
+datasets.
+
+~~~python
+views.visualize_walaris_dataset(data_domain='all',
+                              data_split='whole',
+                              class_type='all', include_thermal_synthetic=False)
+~~~
+
+Randomly select images from our dataset and display them with their labels.
+
+~~~python
+views.visualize_img_using_walaris_label(img_path)
+~~~
+
+Display the labelled image from the walaris dataset at the specified image path.
+
+~~~python
+visualize_coco_labelled_img(img_path, annotations, label_convention)
+~~~
+
+Display an image using coco format annotations to show the labels.
+
+~~~python
+views.show_bboxes(boxes, ax, bbox_format, labels)
+~~~
+
+Displays an image with bounding boxes and labels drawn.
+
+## labels module
+
+**Note** There are a variety of dictionaries mapping numbers to label names for different standard formats including the walaris format, coco format and more. Explore the data_processing/labels.py file to see.
+
+~~~python
+labels.get_random_label(data_type='all',
+                     data_split='whole',
+                     class_type='all',
+                     include_thermal_synthetic=False):
+~~~
+
+Provide the image information from a random image from the walaris datset.
+
+### For COCO datasets..
+
+The following are some of the most useful functions for working with COCO datasets.
+
+~~~python
+labels.get_annotations_by_img_id(annotations,
+                              target_img_id,
+                              anns_sorted=True)
+~~~
+
+Gets a list of annotations that correspond to a specific image id.
+
+~~~python
+labels.get_rand_sample_from_coco_json(original_json_file,
+                                   new_json_file,
+                                   sample_size,
+                                   seed=None,
+                                   include_unlabelled_images=False)
+~~~
+
+Randomly sample a coco format dataset from a coco format dataset.
+
+~~~python
+labels.remove_labels_by_class_coco(coco_json_file,
+                                new_json_file,
+                                label_convention='walaris',
+                                classes_to_include=None,
+                                classes_to_remove=None,
+                                include_images_w_no_labels=False)
+~~~
+
+Users can specify which classes to keep or which classes to remove from a coco dataset. Helps to clean unwanted classes from a dataset.
+
+~~~python
+labels.get_category_info_coco_format(json_file,
+                                  label_convention,
+                                  isPrint=False)
+~~~
+
+Print out information in the terminal regarding the categories found and number of categories in a coco ground truth or results dataset.
+
+~~~python
+labels.get_bbox_info_from_coco_annotations(annotations,
+                                           label_convention,
+                                           class_name_to_show,
+                                           bin_count = 1000)
+~~~
+
+Plot information regarding the distribution of bbox sizes for a class using a frequency plot histogram.
+
+### For yolo datasets (Ultralytics models)..
+
+**WARNING** Please know that the below functions will be moving images to and from your walaris dataset to create the directory structures necessary to train Ultralitic's YOLO models. If you follow the instructions, you will not lost data, but there is potential to lose your images if you delete the created yolo dataset or change the paths to or within the created dataset. As a good rule of thumb, always call the `labels.restore_walaris_dataset()` function when you are done training to restore the dataset and avoid the risk of losing data. 
+
+~~~python
+labels.get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
+                                            coco_val_json_file: str,
+                                            yolo_dataset_base_path: str,
+                                            dataset_name: str = None,
+                                            class_names = 'walaris_18')
+~~~
+
+Transform a coco dataset the references images from the walaris main dataset into a yolo formatted dataset. The images will need to be moved from their standard location in the Tarsier_Main_Dataset to a new folder in the yolo_dataset_base_path. These images can be moved back with the restore_walaris_dataset() function.
+
+~~~python
+labels.restore_walaris_dataset()
+~~~
+
+This file can be called to restore your walaris dataset as long as you have not modified the directory structure of any auxiliary datasets that you have created.
