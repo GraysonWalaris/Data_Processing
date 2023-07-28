@@ -44,10 +44,10 @@ export WALARIS_MAIN_DATA_PATH='/home/grayson/Documents/Tarsier_Main_Dataset/'
 For creating YOLO datasets from COCO json files, you will need to add one environment variable to your ~/.bashrc:
 
 ~~~bash
-export YOLO_ADMIN_PATH='/home/$USER/yolo_admin_files'
+export WALARIS_RESTORE_PATH='/home/$USER/walaris_dataset_restore_files'
 ~~~
 
-**WARNING**: You can specify the YOLO_ADMIN_PATH anywhere you like, but it is recommended to make sure that it is specified to a path that is very unlikely to be deleted. If this path is deleted when you have an active yolo dataset, you will lose the ability to restore your Walaris main dataset and will have to re-sync your dataset (download all lost images).
+**WARNING**: You can specify the WALARIS_RESTORE_PATH anywhere you like, but it is recommended to make sure that it is specified to a path that is very unlikely to be deleted. If this path is deleted when you have an active auxiliary dataset, you will lose the ability to restore your Walaris main dataset and will have to re-sync your dataset (download all lost images).
 
 Now you should be set up!
 
@@ -59,7 +59,7 @@ For training using a COCO dataset with Walaris training images, a few requiremen
 1. Each image must be located within the $WALARIS_MAIN_DATA_PATH/Images directory.
 2. The file name for each image in the coco dataset must be the relative path to that image from the $WALARIS_MAIN_DATA_PATH/Images directory.
 
-You can use the label converter to generate coco datasets from the walaris main dataset, and can write custom scripts to add other images to the coco dataset.
+You can use the walaris label converter to generate coco datasets from the walaris main dataset, and can write custom scripts to add other images to the coco dataset.
 
 ### Visualizing Dataset
 
@@ -72,11 +72,11 @@ view.visualize_coco_ground_truth_dataset('path/to/coco_file.json',
                                          label_convention='walaris')
 ~~~
 
-## YOLO Training
+## YOLO Training (Ultralytics Models)
 
 ([Official YOLO Dataset Format](https://docs.ultralytics.com/datasets/detect/))
 
-For training a custom YOLO model using our data, we had to get creative. Our file structure for our dataset does not allow us to easily train on YOLO models, because YOLO datasets are set up with all of the images in one folder and all of the labels in another folder. This format does not work with our 'relative path' file structure for our images that we use for COCO datasets.
+For training a custom YOLO model (Ultralytics Version) using our data, we had to get creative. Our file structure for our dataset does not allow us to easily train on YOLO models, because YOLO datasets are set up with all of the images in one folder and all of the labels in another folder. This format does not work with our 'relative path' file structure for our images that we use for COCO datasets.
 
 **WARNING**: Be aware that creating a YOLO dataset from our main dataset involves moving all of the image files from their original locations. If you do not follow the steps exactly as shown below, you risk losing some images and having to re-sync your dataset.
 

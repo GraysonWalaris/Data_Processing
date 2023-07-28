@@ -9,25 +9,25 @@ from tqdm import tqdm
 import shutil
 import yaml
 
-assert os.environ.get('YOLO_ADMIN_PATH'), "You must set the YOLO_ADMIN_PATH environment variable!"
+assert os.environ.get('WALARIS_RESTORE_PATH'), "You must set the WALARIS_RESTORE_PATH environment variable!"
 assert os.environ.get('WALARIS_MAIN_DATA_PATH'), "You must set the WALARIS_MAIN_DATA_PATH environment variable!"
 
 IMAGES_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'),
                                 'Images')
 LABELS_BASE_PATH = os.path.join(os.environ.get('WALARIS_MAIN_DATA_PATH'), 
                                 'Labels_NEW')
-YOLO_DATASET_LOG = os.path.join(os.environ.get('YOLO_ADMIN_PATH'),
-                                'yolo_dataset_log.txt')
-YOLO_FILE_NAME2RELATIVE_PATH = os.path.join(os.environ.get('YOLO_ADMIN_PATH'),
+RESTORE_DATASET_LOG = os.path.join(os.environ.get('WALARIS_RESTORE_PATH'),
+                                'dataset_log.txt')
+RESTORE_FILE_NAME2RELATIVE_PATH = os.path.join(os.environ.get('WALARIS_RESTORE_PATH'),
                                             'file_name2relative_path.json')
 
 # set up yolo admin folder if it does not exist
-if not os.path.exists(os.environ.get('YOLO_ADMIN_PATH')):
-    os.makedirs(os.environ.get('YOLO_ADMIN_PATH'))
+if not os.path.exists(os.environ.get('WALARIS_RESTORE_PATH')):
+    os.makedirs(os.environ.get('WALARIS_RESTORE_PATH'))
 
 # create the yolo log file if it does not exist
-if not os.path.isfile(YOLO_DATASET_LOG):
-    with open(YOLO_DATASET_LOG, 'w') as file:
+if not os.path.isfile(RESTORE_DATASET_LOG):
+    with open(RESTORE_DATASET_LOG, 'w') as file:
         pass
 
 def get_file_name2relative_path_json_file():
@@ -65,12 +65,12 @@ def get_file_name2relative_path_json_file():
         
     # save the json file
     print('saving to json file in yolo admin directory...')
-    with open(YOLO_FILE_NAME2RELATIVE_PATH, 'w') as file:
+    with open(RESTORE_FILE_NAME2RELATIVE_PATH, 'w') as file:
         json.dump(file_name2relative_path, file)
 
 # create the file_name2relative_path dictionary if it does not exist
-if not os.path.isfile(YOLO_FILE_NAME2RELATIVE_PATH):
-    print(f"No name2relative_path file found. Creating one and placing it in {os.environ.get('YOLO_ADMIN_PATH')}")
+if not os.path.isfile(RESTORE_FILE_NAME2RELATIVE_PATH):
+    print(f"No name2relative_path file found. Creating one and placing it in {os.environ.get('WALARIS_RESTORE_PATH')}")
     get_file_name2relative_path_json_file()
 
 # the COCO paper uses the below classes. the coco dataset uses an expanded version
@@ -1294,6 +1294,8 @@ def convert_labels_coco2yolo(coco_json_file: str,
         # print(f"img_dict id: {images[img_idx]['id']}")
         if new_img_id != img_id:
             # save the labels list to the old label_file_name
+            if '.jpg' in label_file_name:
+                print('wtf')
             with open(label_file_name, 'w') as file:
                 for label in labels:
                     file.write(label+'\n')
@@ -1313,11 +1315,12 @@ def convert_labels_coco2yolo(coco_json_file: str,
 
             if '.png' in img_path:
                 label_file_name = os.path.join(yolo_label_folder,
-                                            images[0]['file_name'].split('/')[-1].replace('png', 'txt'))
+                                            images[img_idx]['file_name'].split('/')[-1].replace('png', 'txt'))
             elif '.jpg' in img_path:
                 label_file_name = os.path.join(yolo_label_folder,
-                                            images[0]['file_name'].split('/')[-1].replace('jpg', 'txt'))
-
+                                            images[img_idx]['file_name'].split('/')[-1].replace('jpg', 'txt'))
+            else:
+                raise Exception("Error: invalid image format in dataset (.jpg and .png accepted)..")
         # get the label in the yolo label format string
         cat_id = str(ann['category_id']-1)
 
@@ -1360,22 +1363,22 @@ def convert_labels_coco2yolo(coco_json_file: str,
         # add the yolo label to the labels list
         labels.append(yolo_label)
 
-def move_coco_imgs_to_yolo_folder(coco_json_file: str,
-                                  yolo_image_folder: str):
+def move_img_subset(coco_json_file: str,
+                    dest_folder: str):
     """Moves the images found in a coco dataset json file to the specified yolo
     image folder. The path to this folder will be recorded in your... TODO: add environment variable here 
     
     Args:
         coco_json_file (str): path to json file in the coco format
-        yolo_image_folder (str): path to the folder to save the iamges to
+        dest_folder (str): path to the folder to save the iamges to
 
     Returns:
         
     """
 
     # create the new yolo images directory if it does not exists
-    if not os.path.exists(yolo_image_folder):
-        os.makedirs(yolo_image_folder)
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
 
     # load the coco information
     print('Loading train json data..')
@@ -1395,12 +1398,12 @@ def move_coco_imgs_to_yolo_folder(coco_json_file: str,
     for img_dict in images:
         relative_path = img_dict['file_name']
         file_name = relative_path.split('/')[-1]
-        new_full_path = os.path.join(yolo_image_folder, file_name)
+        new_full_path = os.path.join(dest_folder, file_name)
         new_file_paths.append(new_full_path+'\n')
 
 
     # write all of the new file paths to the log.txt file
-    with open(YOLO_DATASET_LOG, '+a') as file:
+    with open(RESTORE_DATASET_LOG, '+a') as file:
         file.writelines(new_file_paths)
     
     # now move each image, if there is an error moving, run the yolo_clean
@@ -1410,14 +1413,14 @@ def move_coco_imgs_to_yolo_folder(coco_json_file: str,
         relative_path = img_dict['file_name']
         full_path = os.path.join(IMAGES_BASE_PATH, relative_path)
         file_name = relative_path.split('/')[-1]
-        new_full_path = os.path.join(yolo_image_folder, file_name)
+        new_full_path = os.path.join(dest_folder, file_name)
 
         # move the image
         try:
             shutil.move(full_path, new_full_path)
         except:
             print('There was an error in moving the files. Restoring dataset..')
-            yolo_clean()
+            restore_walaris_dataset()
 
 def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
                                          coco_val_json_file: str,
@@ -1446,7 +1449,7 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
     """
 
     # restore the original dataset before creating the new yolo dataset
-    yolo_clean()
+    restore_walaris_dataset()
     
     try:
         # make sure the class names input is valid
@@ -1469,7 +1472,7 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
         train_labels_folder_path = os.path.join(train_folder_path, 'labels')
 
         convert_labels_coco2yolo(coco_train_json_file, train_labels_folder_path)
-        move_coco_imgs_to_yolo_folder(coco_train_json_file, train_images_folder_path)
+        move_img_subset(coco_train_json_file, train_images_folder_path)
 
         # save the validataion images and labels to their new locations
         val_folder_path = os.path.join(yolo_dataset_base_path, 'valid')
@@ -1477,7 +1480,7 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
         val_labels_folder_path = os.path.join(val_folder_path, 'labels')
 
         convert_labels_coco2yolo(coco_val_json_file, val_labels_folder_path)
-        move_coco_imgs_to_yolo_folder(coco_val_json_file, val_images_folder_path)
+        move_img_subset(coco_val_json_file, val_images_folder_path)
 
         # create the .yaml file. if no name is provided, name it the same as the
         # training coco json file
@@ -1500,7 +1503,58 @@ def get_yolo_dataset_from_coco_json_file(coco_train_json_file: str,
     except Exception as inst:
         print('There was an error creating the dataset...')
         print(inst)
-        yolo_clean()
+        restore_walaris_dataset()
+
+def save_json_in_standard_coco_dir_format(coco_json_file: str,
+                                          annotations_folder: str,
+                                          isTrainset: bool):
+    """Helper function to take a COCO dataset and modify the image paths to
+    only be the filename as in the normal standard COCO directory structure:
+
+    COCO_Folder
+    |   annotations
+    |   |   instances_train.json
+    |   |   instances_val.json
+    |   train
+    |   |   * all training images *
+    |   val
+    |   |   * all validation images *
+    
+    
+    Args:
+        coco_json_file (str): path to json file in the coco format
+        annotations_folder (str): path to the folder to save the labels to
+        isTrainset (bool): specify whether this is a training set or val set
+
+    Returns:
+        
+    """
+
+    # create the new yolo labels directory if it does not exists
+    if not os.path.exists(annotations_folder):
+        os.makedirs(annotations_folder)
+
+    # load the coco information
+    with open(coco_json_file, 'r') as file:
+        coco_data = json.load(file)
+
+    images = coco_data['images']
+
+    for idx in range(len(images)):
+        file_name = images[idx]['file_name']
+        images[idx]['file_name'] = file_name.split('/')[-1]
+
+    coco_data['images'] = images
+
+    if isTrainset:
+        new_json_file = os.path.join(annotations_folder,
+                                     'instances_train.json')
+    else:
+        new_json_file = os.path.join(annotations_folder,
+                                     'instances_val.json')
+        
+    with open(new_json_file, 'w') as file:
+        json.dump(coco_data, file)
 
 def get_coco_dataset_from_coco_json_file(coco_train_json_file: str,
                                          coco_val_json_file: str,
@@ -1529,7 +1583,7 @@ def get_coco_dataset_from_coco_json_file(coco_train_json_file: str,
     """
 
     # restore the original dataset before creating the new yolo dataset
-    yolo_clean()
+    restore_walaris_dataset()
     
     try:
         # make sure the class names input is valid
@@ -1546,46 +1600,38 @@ def get_coco_dataset_from_coco_json_file(coco_train_json_file: str,
         if not os.path.exists(dataset_folder_base_path):
             os.makedirs(dataset_folder_base_path)
 
-        # save the training images and labels to their new locations
-        train_folder_path = os.path.join(dataset_folder_base_path, 'train')
-        train_images_folder_path = os.path.join(train_folder_path, 'images')
-        train_labels_folder_path = os.path.join(train_folder_path, 'labels')
+        # create the new annotations directory
+        annotations_folder_path = os.path.join(dataset_folder_base_path,
+                                          'annotations')
+        os.makedirs(annotations_folder_path)
 
-        convert_labels_coco2yolo(coco_train_json_file, train_labels_folder_path)
-        move_coco_imgs_to_yolo_folder(coco_train_json_file, train_images_folder_path)
+        # save the training images and labels to their new locations
+        train_images_folder_path = os.path.join(dataset_folder_base_path, 
+                                                'train')
+
+        save_json_in_standard_coco_dir_format(coco_train_json_file,
+                                              annotations_folder_path,
+                                              isTrainset=True)
+        move_img_subset(coco_train_json_file, 
+                        train_images_folder_path)
 
         # save the validataion images and labels to their new locations
-        val_folder_path = os.path.join(dataset_folder_base_path, 'valid')
-        val_images_folder_path = os.path.join(val_folder_path, 'images')
-        val_labels_folder_path = os.path.join(val_folder_path, 'labels')
+        val_images_folder_path = os.path.join(dataset_folder_base_path, 
+                                              'val')
 
-        convert_labels_coco2yolo(coco_val_json_file, val_labels_folder_path)
-        move_coco_imgs_to_yolo_folder(coco_val_json_file, val_images_folder_path)
-
-        # create the .yaml file. if no name is provided, name it the same as the
-        # training coco json file
-        if dataset_name is None:
-            dataset_name = coco_train_json_file.split('/')[-1].replace('json', '')
-
-        # create yaml data and save to file
-        yaml_data = {}
-        yaml_data['train'] = 'train/images'
-        yaml_data['val'] = 'valid/images'
-        yaml_data['nc'] = len(class_names)
-        yaml_data['names'] = class_names
-        yaml_file_path = os.path.join(dataset_folder_base_path,
-                                    dataset_name+'.yaml')
-        with open(yaml_file_path, 'w') as file:
-            yaml.dump(yaml_data, file)
+        save_json_in_standard_coco_dir_format(coco_val_json_file, 
+                                              annotations_folder_path,
+                                              isTrainset=False)
+        move_img_subset(coco_val_json_file, val_images_folder_path)
 
     # if there is any error in creating the dataset, attempt to restore the 
     # original dataset and check for lost files   
     except Exception as inst:
         print('There was an error creating the dataset...')
         print(inst)
-        yolo_clean()
+        restore_walaris_dataset()
 
-def yolo_clean():
+def restore_walaris_dataset():
     """Uses the yolo_dataset_log and the file_name2relative_path.json files to
     restore the walaris main dataset from any existing yolo datasets.
     
@@ -1597,17 +1643,17 @@ def yolo_clean():
     
     """
 
-    assert os.path.exists(YOLO_FILE_NAME2RELATIVE_PATH), "You must download the file_name2relative_path.json file before continuing.."
+    assert os.path.exists(RESTORE_FILE_NAME2RELATIVE_PATH), "You must download the file_name2relative_path.json file before continuing.."
     
     # load the log data to get a list of images that are currently in custom yolo
     # datasets and not in their standard location in the walaris main dataset
-    log_path = YOLO_DATASET_LOG
+    log_path = RESTORE_DATASET_LOG
 
     with open(log_path, 'r') as file:
         new_paths = file.readlines()
 
     # get the file_name2relative_path dictionary
-    with open(YOLO_FILE_NAME2RELATIVE_PATH, 'r') as file:
+    with open(RESTORE_FILE_NAME2RELATIVE_PATH, 'r') as file:
         name2relative_path = json.load(file)
 
     """ loop through each new_file path. 
@@ -1645,7 +1691,7 @@ def yolo_clean():
             lost_images.append(relative_path)
     
     # clear the yolo log.txt file
-    with open(YOLO_DATASET_LOG, 'w') as file:
+    with open(RESTORE_DATASET_LOG, 'w') as file:
         pass
 
     # warn the user if there were any lost images
@@ -1653,6 +1699,7 @@ def yolo_clean():
         print(f'''Warning: Found {len(lost_images)} lost images. Saving the 
               relative paths of these images to current_dir/lost_images.txt''')
         with open('lost_images.txt', 'w') as file:
-            file.writelines(lost_images)
+            for img_path in lost_images:
+                file.write(img_path+'\n')
     else:
         print('All images restored successfully!')
