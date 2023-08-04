@@ -1240,6 +1240,136 @@ def get_bbox_info_from_coco_annotations(annotations,
     plt.hist(bbox_areas, bins=bins)
     plt.show()
 
+def add_coco_subset(dataset_to_modify: str,
+                    save_path: str,
+                    coco_annotations_path: str,
+                    coco_image_folder_path: str,
+                    classes_to_add: list,
+                    target_label_convention: str or dict):
+    """Adds images and annotations from a coco dataset to an existing dataset.
+    Can be used to increase the diversity and quality of data in the datset.
+    
+    Args:
+        dataset_to_modify (str): path to the json file that you will add to
+        save_path (str): path to the new file (must be json file)
+        coco_annotations_path (str): path to your coco annotations file
+        coco_image_folder_path (str): path to the folder containing the images
+            in the coco_annotations_path
+        classes_to_add (list): list of strings of class names that to include.
+        target_label_convention (str or list): either one of the supported
+            strings (walaris, coco) or a custom dictionary mapping names to
+            category numbers
+
+    Returns:
+
+    """
+
+    supported_label_conventions = {'walaris', 'coco'}
+
+    if isinstance(target_label_convention, str):
+        assert target_label_convention in supported_label_conventions, "Error"\
+        ": the given target label convention is not valid ('walaris' or 'coco')"
+
+        if target_label_convention == 'walaris':
+            label_conv_name2num = WALARIS_CLASS_LABELS_NAME2NUM
+        elif target_label_convention == 'coco':
+            label_conv_name2num = COCO_CLASSES_DICT_NAME2NUM
+    else:
+        assert isinstance(target_label_convention, dict), "Error: "\
+        "unsupported target label convention type (must be str or dict)."
+        label_conv_name2num = target_label_convention
+
+    # need to ensure that the coco image folder path is an extention of the 
+    # WALARIS_MAIN_DATA_PATH environment variable
+    assert IMAGES_BASE_PATH in coco_image_folder_path, "Error: Please ensure"\
+    "that your coco image folder is within your WALARIS_MAIN_DATA_PATH directory."
+
+    # get the relative path to the coco_image_folder from the WALARIS_MAIN_DATA_PATH
+    coco_image_folder_path_list = coco_image_folder_path.split('/')
+    base_walaris_img_folder = IMAGES_BASE_PATH.split('/')[-1]
+    idx = 0
+    while (coco_image_folder_path_list[idx] != base_walaris_img_folder):
+        idx += 1
+    
+    coco_image_folder_relative_path = ('/').join(coco_image_folder_path_list[idx+1:])
+
+    classes_to_add = set(classes_to_add)
+
+    # load the original_data
+    with open(dataset_to_modify, 'r') as file:
+        original_data = json.load(file)
+
+    # change all of the annotation and image ids to be strings of numbers
+    # counting up from 1
+
+    # original images
+    old2new_img_id = dict()
+    img_id_count = 1
+    for idx in range(len(original_data['images'])):
+        old2new_img_id[original_data['images'][idx]['id']] = str(img_id_count).zfill(10)
+        original_data['images'][idx]['id'] = str(img_id_count).zfill(10)
+        img_id_count += 1
+
+    # original annotations
+    ann_id_count = 1
+    for idx in range(len(original_data['annotations'])):
+        original_data['annotations'][idx]['id'] = str(ann_id_count).zfill(10)
+        original_data['annotations'][idx]['image_id'] = old2new_img_id[original_data['annotations'][idx]['image_id']]
+        ann_id_count += 1
+
+    # load the coco annotations
+    with open(coco_annotations_path, 'r') as file:
+        coco_data = json.load(file)
+
+    # loop through the coco annotations, if the annotation category id is in
+    # the classes_to_add list, then add the annotation to the annotations_to_add
+    # list
+    anns_to_add = []
+    for ann in coco_data['annotations']:
+        ann_category_name = COCO_CLASSES_DICT_NUM2NAME[ann['category_id']]
+        if ann_category_name in classes_to_add:
+            anns_to_add.append(ann)
+
+    old2new_img_id = dict()
+    for idx in range(len(anns_to_add)):
+        if anns_to_add[idx]['image_id'] not in old2new_img_id:
+            old2new_img_id[anns_to_add[idx]['image_id']] = str(img_id_count).zfill(10)
+            img_id_count += 1
+        anns_to_add[idx]['id'] = str(ann_id_count).zfill(10)
+        ann_id_count += 1
+
+    # loop through all images from the coco dataset. If the image ID is in
+    # old2new image, modify the image id and relative file name and add it to 
+    # images to add
+    imgs_to_add = []
+    for image in coco_data['images']:
+        if image['id'] in old2new_img_id:
+            image['id'] = old2new_img_id[image['id']]
+            image['file_name'] = os.path.join(coco_image_folder_relative_path,
+                                              image['file_name'])
+            imgs_to_add.append(image)
+    
+    # modify all of the image ids in the anns to add list
+    for idx in range(len(anns_to_add)):
+        anns_to_add[idx]['image_id'] = old2new_img_id[anns_to_add[idx]['image_id']]
+
+    # modify the category id
+    for idx in range(len(anns_to_add)):
+        category_name = COCO_CLASSES_DICT_NUM2NAME[anns_to_add[idx]['category_id']]
+        anns_to_add[idx]['category_id'] = label_conv_name2num[category_name]
+
+    # add the images to add to the original dataset
+    original_data['images'] += imgs_to_add
+
+    # add the annotations to add to the original dataset
+    original_data['annotations'] += anns_to_add
+
+    # save in a new json file
+    print(f'Saving new json file to {save_path}...')
+    with open(save_path, 'w') as file:
+        json.dump(original_data, file)
+    
+
 #---------------------------------YOLO FORMAT---------------------------------*
 
 def convert_labels_coco2yolo(coco_json_file: str,
